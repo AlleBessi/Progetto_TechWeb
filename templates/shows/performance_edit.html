@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Modifica performance{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto card p-6">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+            <h1 class="section-title">Modifica performance</h1>
+            <p class="text-sm text-slate-600">{{ performance.show.title }} - {{ performance.hall.name }}</p>
+        </div>
+        <form action="/theaters/{{ theater.id }}/" method="get">
+            <button class="btn btn-ghost btn-sm" type="submit">Torna al teatro</button>
+        </form>
+    </div>
+    <form method="post" class="space-y-4">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn btn-primary" type="submit">Salva</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+    {{ form.media }}
+{% endblock %}

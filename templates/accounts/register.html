@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Registrazione{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto card p-6">
+    <h1 class="section-title mb-4">Crea account</h1>
+    <form method="post" class="space-y-4">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn btn-primary" type="submit">Registrati</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+    {{ form.media }}
+{% endblock %}

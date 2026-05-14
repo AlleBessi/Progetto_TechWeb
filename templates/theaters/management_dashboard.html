@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Gestione teatri{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <h1 class="section-title">Gestione teatri</h1>
+    {% if user.is_superuser %}
+        <form action="/theaters/new/" method="get">
+            <button class="btn btn-primary btn-sm" type="submit">Nuovo teatro</button>
+        </form>
+    {% endif %}
+</div>
+
+<div class="grid md:grid-cols-2 gap-4">
+    {% for theater in theaters %}
+        <div class="card p-4 space-y-3">
+            <div>
+                <h2 class="font-semibold">{{ theater.name }}</h2>
+                <p class="text-sm text-slate-600">{{ theater.city }}</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <form action="/theaters/{{ theater.id }}/" method="get">
+                    <button class="btn btn-ghost btn-sm" type="submit">Dettagli</button>
+                </form>
+                <form action="/theaters/{{ theater.id }}/halls/new/" method="get">
+                    <button class="btn btn-outline btn-sm" type="submit">Nuova sala</button>
+                </form>
+                {% if user.is_superuser %}
+                    <form action="/theaters/{{ theater.id }}/edit/" method="get">
+                        <button class="btn btn-outline btn-sm" type="submit">Modifica</button>
+                    </form>
+                    <form action="/theaters/{{ theater.id }}/delete/" method="post">
+                        {% csrf_token %}
+                        <button class="btn btn-danger btn-sm" type="submit">Elimina</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+    {% empty %}
+        <p class="text-sm text-slate-600">Nessun teatro assegnato.</p>
+    {% endfor %}
+</div>
+{% endblock %}

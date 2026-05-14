@@ -1,0 +1,14 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+Django = ">=6.0,<7.0"
+Pillow = ">=10.0"
+django-select2 = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.14"

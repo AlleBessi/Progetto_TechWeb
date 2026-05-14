@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Le tue prenotazioni{% endblock %}
+
+{% block content %}
+<h1 class="section-title mb-4">Le tue prenotazioni</h1>
+<div class="space-y-3">
+    {% for booking in bookings %}
+        <div class="card p-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 class="font-semibold">{{ booking.performance.show.title }}</h2>
+                    <p class="text-sm text-slate-600">{{ booking.performance.theater.name }} - {{ booking.performance.starts_at }}</p>
+                    <p class="text-sm">Totale: {{ booking.total_price }} EUR</p>
+                </div>
+                {% if booking.status != 'cancelled' %}
+                    <div class="flex flex-wrap gap-2 text-sm">
+                        <form action="/bookings/{{ booking.id }}/edit/" method="get">
+                            <button class="btn btn-outline btn-sm" type="submit">Modifica</button>
+                        </form>
+                        <form action="/bookings/{{ booking.id }}/cancel/" method="post">
+                            {% csrf_token %}
+                            <button class="btn btn-danger btn-sm" type="submit">Annulla</button>
+                        </form>
+                    </div>
+                {% else %}
+                    <span class="badge">Annullata</span>
+                {% endif %}
+            </div>
+            <div class="text-xs text-slate-500 mt-2">
+                Posti: {% for seat in booking.seats.all %}{{ seat.seat.row }}{{ seat.seat.number }}{% if not forloop.last %}, {% endif %}{% endfor %}
+            </div>
+        </div>
+    {% empty %}
+        <p class="text-sm text-slate-600">Nessuna prenotazione.</p>
+    {% endfor %}
+</div>
+{% endblock %}

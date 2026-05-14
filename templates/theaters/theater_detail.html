@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}{{ theater.name }}{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+    <div>
+        <h1 class="section-title">{{ theater.name }}</h1>
+        <p class="text-sm text-slate-600">{{ theater.address }} - {{ theater.city }}</p>
+    </div>
+    {% if admin_allowed or user.is_superuser %}
+        <div class="flex flex-wrap gap-2 text-sm">
+            <form action="/theaters/{{ theater.id }}/halls/new/" method="get">
+                <button class="btn btn-outline btn-sm" type="submit">Nuova sala</button>
+            </form>
+            <form action="/shows/theater/{{ theater.id }}/performance/new/" method="get">
+                <button class="btn btn-outline btn-sm" type="submit">Nuova performance</button>
+            </form>
+            {% if user.is_superuser %}
+                <form action="/theaters/{{ theater.id }}/admins/new/" method="get">
+                    <button class="btn btn-ghost btn-sm" type="submit">Assegna admin</button>
+                </form>
+                <form action="/theaters/{{ theater.id }}/edit/" method="get">
+                    <button class="btn btn-ghost btn-sm" type="submit">Modifica</button>
+                </form>
+                <form action="/theaters/{{ theater.id }}/delete/" method="post">
+                    {% csrf_token %}
+                    <button class="btn btn-danger btn-sm" type="submit">Elimina</button>
+                </form>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+
+{% if admin_allowed or user.is_superuser %}
+    <section class="space-y-3 mb-6">
+        <h2 class="section-title">Sale</h2>
+        <div class="grid md:grid-cols-2 gap-3">
+            {% for hall in halls %}
+                <div class="card p-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 class="font-semibold">{{ hall.name }}</h3>
+                        <p class="text-xs text-slate-500">Posti: {{ hall.seats.count }}</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <form action="/theaters/{{ theater.id }}/halls/{{ hall.id }}/manage/" method="get">
+                            <button class="btn btn-outline btn-sm" type="submit">Gestisci zone</button>
+                        </form>
+                        <form action="/theaters/{{ theater.id }}/halls/{{ hall.id }}/delete/" method="post">
+                            {% csrf_token %}
+                            <button class="btn btn-danger btn-sm" type="submit">Elimina</button>
+                        </form>
+                    </div>
+                </div>
+            {% empty %}
+                <p class="text-sm text-slate-600">Nessuna sala inserita.</p>
+            {% endfor %}
+        </div>
+    </section>
+{% endif %}
+
+<section class="space-y-3">
+    <h2 class="section-title">Programmazione</h2>
+    {% for performance in performances %}
+        <div class="card p-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h3 class="font-semibold">{{ performance.show.title }}</h3>
+                <p class="text-sm text-slate-600">{{ performance.starts_at }}</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                {% if can_book %}
+                    <form action="/bookings/performance/{{ performance.id }}/" method="get">
+                        <button class="btn btn-primary btn-sm" type="submit">Prenota</button>
+                    </form>
+                {% elif user.is_authenticated and not can_book %}
+                    <span class="badge">Solo utenti standard</span>
+                {% else %}
+                    <form action="/accounts/login/" method="get">
+                        <button class="btn btn-outline btn-sm" type="submit">Accedi</button>
+                    </form>
+                {% endif %}
+                {% if admin_allowed or user.is_superuser %}
+                    <form action="/shows/performance/{{ performance.id }}/edit/" method="get">
+                        <button class="btn btn-ghost btn-sm" type="submit">Modifica</button>
+                    </form>
+                    <form action="/shows/performance/{{ performance.id }}/delete/" method="post">
+                        {% csrf_token %}
+                        <button class="btn btn-danger btn-sm" type="submit">Elimina</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+    {% empty %}
+        <p class="text-sm text-slate-600">Nessuna performance programmata.</p>
+    {% endfor %}
+</section>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+{% if user.is_authenticated and not can_book %}
+    <div class="card px-4 py-3 text-sm text-slate-600">
+        Sei registrato come artista o gestore: la prenotazione dei posti non e disponibile.
+    </div>
+{% endif %}
+<div class="grid lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 space-y-6">
+        <section>
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="section-title">Prossime performance</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-4">
+                {% for performance in performances %}
+                    <div class="card p-4 space-y-2">
+                        <div>
+                            <h3 class="font-semibold">{{ performance.show.title }}</h3>
+                            <p class="text-sm text-slate-600">{{ performance.theater.name }} - {{ performance.starts_at }}</p>
+                            <p class="text-xs text-slate-500">{{ performance.show.category.name }}</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            {% if can_book %}
+                                <form action="/bookings/performance/{{ performance.id }}/" method="get">
+                                    <button class="btn btn-primary btn-sm" type="submit">Prenota</button>
+                                </form>
+                            {% elif user.is_authenticated and not can_book %}
+                                <span class="badge">Solo utenti standard</span>
+                            {% else %}
+                                <form action="/accounts/login/" method="get">
+                                    <button class="btn btn-outline btn-sm" type="submit">Accedi</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% empty %}
+                    <p class="text-sm text-slate-600">Nessuna performance disponibile.</p>
+                {% endfor %}
+            </div>
+        </section>
+
+        {% if recommendations %}
+        <section>
+            <h2 class="section-title mb-3">Consigliati per te</h2>
+            <div class="grid md:grid-cols-2 gap-4">
+                {% for performance in recommendations %}
+                    <div class="card p-4 space-y-2">
+                        <div>
+                            <h3 class="font-semibold">{{ performance.show.title }}</h3>
+                            <p class="text-sm text-slate-600">{{ performance.theater.name }} - {{ performance.starts_at }}</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            {% if can_book %}
+                                <form action="/bookings/performance/{{ performance.id }}/" method="get">
+                                    <button class="btn btn-primary btn-sm" type="submit">Prenota</button>
+                                </form>
+                            {% elif user.is_authenticated and not can_book %}
+                                <span class="badge">Solo utenti standard</span>
+                            {% else %}
+                                <form action="/accounts/login/" method="get">
+                                    <button class="btn btn-outline btn-sm" type="submit">Accedi</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+    </div>
+
+    <aside class="space-y-6">
+        <section class="card p-4 space-y-3">
+            <h2 class="section-title">Ricerca rapida</h2>
+            <form action="/search/" method="get">
+                <button class="btn btn-outline btn-sm" type="submit">Vai alla ricerca</button>
+            </form>
+        </section>
+
+        <section class="card p-4">
+            <h2 class="section-title mb-2">Teatri vicini</h2>
+            {% if nearby %}
+                <ul class="space-y-2 text-sm">
+                    {% for distance, theater in nearby %}
+                        <li>
+                            <form action="/theaters/{{ theater.id }}/" method="get">
+                                <button class="btn btn-ghost btn-sm" type="submit">{{ theater.name }}</button>
+                            </form>
+                            <div class="text-slate-600">{{ distance|floatformat:1 }} km</div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="text-sm text-slate-600">Aggiungi coordinate nel profilo per suggerimenti.</p>
+            {% endif %}
+        </section>
+    </aside>
+</div>
+{% endblock %}

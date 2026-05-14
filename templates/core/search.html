@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Ricerca{% endblock %}
+
+{% block content %}
+<div class="grid lg:grid-cols-4 gap-6">
+    <div class="card p-4">
+        <h2 class="section-title mb-3">Filtri</h2>
+        <form method="get" class="space-y-3 text-sm">
+            {{ form.as_p }}
+            <button class="btn btn-primary btn-sm" type="submit">Cerca</button>
+        </form>
+    </div>
+    <div class="lg:col-span-3">
+        <h2 class="section-title mb-3">Risultati</h2>
+        <div class="space-y-3">
+            {% for performance in performances %}
+                <div class="card p-4">
+                    <div class="flex flex-wrap justify-between items-center gap-3">
+                        <div>
+                            <h3 class="font-semibold">{{ performance.show.title }}</h3>
+                            <p class="text-sm text-slate-600">{{ performance.theater.name }} - {{ performance.starts_at }}</p>
+                        </div>
+                        {% if can_book %}
+                            <form action="/bookings/performance/{{ performance.id }}/" method="get">
+                                <button class="btn btn-primary btn-sm" type="submit">Prenota</button>
+                            </form>
+                        {% elif user.is_authenticated and not can_book %}
+                            <span class="badge">Solo utenti standard</span>
+                        {% else %}
+                            <form action="/accounts/login/" method="get">
+                                <button class="btn btn-outline btn-sm" type="submit">Accedi</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+            {% empty %}
+                <p class="text-sm text-slate-600">Nessun risultato.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+    {{ form.media }}
+{% endblock %}
