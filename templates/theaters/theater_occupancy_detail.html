@@ -1,0 +1,88 @@
+{% extends "theaters/theater_management.html" %}
+{% load l10n %}
+
+{% block title %}Occupazione — {{ selected_performance.show.title }}{% endblock %}
+
+{% block management_content %}
+<div class="space-y-4">
+    <div class="card p-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 class="section-title">Cruscotto occupazione</h2>
+            <p class="text-xs text-slate-500">{{ selected_performance.show.title }} • {{ selected_performance.starts_at|date:"d M Y" }} {{ selected_performance.starts_at|time:"H:i" }} • {{ selected_performance.auditorium.name }}</p>
+        </div>
+        <a class="btn btn-ghost btn-sm" href="{% url 'theaters:management_occupancy' theater.id %}">← Torna alla lista</a>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-[1.6fr_0.6fr]">
+        <div class="card p-4">
+            <div class="stage mb-4">Palco</div>
+            <div class="flex flex-wrap gap-3 text-xs mb-4">
+                {% for zone in zone_layout %}
+                    <div class="flex items-center gap-2">
+                        <span class="seat {{ zone.color_class }}">
+                            <span class="seat-label">{{ zone.label|slice:":1" }}</span>
+                        </span>
+                        <span>{{ zone.label }}</span>
+                    </div>
+                {% endfor %}
+                <div class="flex items-center gap-2">
+                    <span class="seat"><span class="seat-label seat-reserved">X</span></span>
+                    <span>Occupato</span>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                {% for zone in zone_layout %}
+                    <div class="card p-4 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h3 class="section-title">{{ zone.label }}</h3>
+                        </div>
+                        <div class="space-y-2">
+                            {% for row, seats in zone.rows %}
+                                <div class="seat-row">
+                                    <span class="w-6 text-xs text-slate-500">{{ row }}</span>
+                                    {% for item in seats %}
+                                        {% if item.is_reserved %}
+                                            <span class="seat"><span class="seat-label seat-reserved">{{ item.seat.number }}</span></span>
+                                        {% else %}
+                                            <span class="seat {{ zone.color_class }}"><span class="seat-label">{{ item.seat.number }}</span></span>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card p-4 space-y-4">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Occupazione per zona</h3>
+            <div class="space-y-4">
+                {% for zone in occupancy_data.zones %}
+                    <div>
+                        <div class="flex items-center justify-between text-xs text-slate-600">
+                            <span>{{ zone.label }}</span>
+                            <span>{{ zone.booked }}/{{ zone.total }} • {{ zone.percentage }}%</span>
+                        </div>
+                        <div class="h-2 w-full overflow-hidden rounded bg-slate-100 mt-1">
+                            <div class="h-2 rounded zone-bar {{ zone.color_class }}" style="width: {{ zone.percentage|unlocalize }}%;"></div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="pt-4 border-t border-slate-200">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Totale sala</h3>
+                <div class="flex items-center justify-between text-xs text-slate-600 mt-2">
+                    <span>Occupazione globale</span>
+                    <span>{{ occupancy_data.global_booked }}/{{ occupancy_data.global_total }} • {{ occupancy_data.global_percentage }}%</span>
+                </div>
+                <div class="h-2 w-full overflow-hidden rounded bg-slate-100 mt-2">
+                    <div class="h-2 rounded bg-indigo-400" style="width: {{ occupancy_data.global_percentage|unlocalize }}%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

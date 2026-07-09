@@ -5,8 +5,8 @@
 {% block content %}
 <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold">Spettacoli</h1>
-    {% if user.is_authenticated and user.profile.role.name == "artist" %}
-        <form action="/shows/artist/dashboard/" method="get">
+    {% if is_artist %}
+        <form action="{% url 'shows:artist_shows_dashboard' %}" method="get">
             <button class="btn btn-outline btn-sm" type="submit">Area artista</button>
         </form>
     {% endif %}
@@ -14,55 +14,7 @@
 
 <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
     {% for show in shows %}
-        <div class="card overflow-hidden hover:shadow-lg transition-shadow duration-300">
-            <!-- Show Cover/Poster -->
-            <div class="relative h-64 bg-gradient-to-br from-slate-200 to-slate-300 overflow-hidden">
-                {% if show.cover %}
-                    <img class="w-full h-full object-cover" src="{{ show.cover.url }}" alt="{{ show.title }}">
-                {% elif show.poster %}
-                    <img class="w-full h-full object-cover" src="{{ show.poster.url }}" alt="{{ show.title }}">
-                {% else %}
-                    <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-blue-200">
-                        <span class="text-slate-400 text-sm">Nessuna immagine</span>
-                    </div>
-                {% endif %}
-                <!-- Category badge -->
-                <div class="absolute top-3 right-3">
-                    <span class="badge bg-slate-900 text-white">{{ show.category.name }}</span>
-                </div>
-            </div>
-
-            <!-- Show Info -->
-            <div class="p-4">
-                <h2 class="font-bold text-lg mb-2">{{ show.title }}</h2>
-
-                <!-- Artists -->
-                <div class="mb-3">
-                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Artisti</p>
-                    <div class="flex flex-wrap gap-1 mt-1">
-                        {% for artist in show.artists.all %}
-                            <span class="text-sm bg-blue-100 text-blue-900 px-2 py-1 rounded">
-                                {{ artist.get_full_name|default:artist.username }}
-                            </span>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <!-- Duration -->
-                <div class="flex items-center gap-2 text-sm text-slate-600 mb-4">
-                    <span>⏱</span>
-                    <span>{{ show.duration_minutes }} minuti</span>
-                </div>
-
-                <!-- Description preview -->
-                <p class="text-sm text-slate-600 line-clamp-2 mb-4">{{ show.description }}</p>
-
-                <!-- View Details Button -->
-                <form action="/shows/{{ show.id }}/" method="get">
-                    <button class="btn btn-primary btn-sm btn-block" type="submit">Vedi dettagli</button>
-                </form>
-            </div>
-        </div>
+        {% include "shows/_show_card.html" with show=show %}
     {% empty %}
         <p class="col-span-full text-center text-slate-500">Nessuno spettacolo disponibile.</p>
     {% endfor %}

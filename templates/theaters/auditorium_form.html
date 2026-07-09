@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load crispy_forms_tags %}
 
 {% block title %}Nuova sala{% endblock %}
 
@@ -7,7 +8,7 @@
     <h1 class="section-title mb-4">Nuova sala per {{ theater.name }}</h1>
     <form method="post" class="space-y-4">
         {% csrf_token %}
-        {{ form.as_p }}
+        {{ form|crispy }}
         <button class="btn btn-primary" type="submit">Crea sala</button>
     </form>
 </div>

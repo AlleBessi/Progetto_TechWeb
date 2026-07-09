@@ -3,95 +3,78 @@
 {% block title %}{{ theater.name }}{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-between mb-4">
-    <div>
-        <h1 class="section-title">{{ theater.name }}</h1>
-        <p class="text-sm text-slate-600">{{ theater.address }} - {{ theater.city }}</p>
-    </div>
-    {% if admin_allowed or user.is_superuser %}
-        <div class="flex flex-wrap gap-2 text-sm">
-            <form action="/theaters/{{ theater.id }}/halls/new/" method="get">
-                <button class="btn btn-outline btn-sm" type="submit">Nuova sala</button>
-            </form>
-            <form action="/shows/theater/{{ theater.id }}/performance/new/" method="get">
-                <button class="btn btn-outline btn-sm" type="submit">Nuova performance</button>
-            </form>
-            {% if user.is_superuser %}
-                <form action="/theaters/{{ theater.id }}/admins/new/" method="get">
-                    <button class="btn btn-ghost btn-sm" type="submit">Assegna admin</button>
-                </form>
-                <form action="/theaters/{{ theater.id }}/edit/" method="get">
-                    <button class="btn btn-ghost btn-sm" type="submit">Modifica</button>
-                </form>
-                <form action="/theaters/{{ theater.id }}/delete/" method="post">
-                    {% csrf_token %}
-                    <button class="btn btn-danger btn-sm" type="submit">Elimina</button>
-                </form>
-            {% endif %}
+<div class="card overflow-hidden">
+    <div class="relative h-80 bg-gradient-to-br from-slate-200 to-slate-300">
+        {% if theater.photo %}
+            <img class="w-full h-full object-cover" src="{{ theater.photo.url }}" alt="{{ theater.name }}">
+        {% else %}
+            <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-blue-200">
+                <span class="text-slate-400">Nessuna immagine disponibile</span>
+            </div>
+        {% endif %}
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent"></div>
+        <div class="absolute bottom-0 left-0 right-0 p-6">
+            <h1 class="text-3xl font-bold text-white mb-2">{{ theater.name }}</h1>
+            <div class="flex flex-wrap gap-2 items-center text-white text-sm">
+                <span>{{ theater.city }}</span>
+                <span>•</span>
+                <span>{{ auditoriums|length }} sale</span>
+            </div>
         </div>
-    {% endif %}
+    </div>
 </div>
 
-{% if admin_allowed or user.is_superuser %}
-    <section class="space-y-3 mb-6">
-        <h2 class="section-title">Sale</h2>
-        <div class="grid md:grid-cols-2 gap-3">
-            {% for hall in halls %}
-                <div class="card p-4 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h3 class="font-semibold">{{ hall.name }}</h3>
-                        <p class="text-xs text-slate-500">Posti: {{ hall.seats.count }}</p>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        <form action="/theaters/{{ theater.id }}/halls/{{ hall.id }}/manage/" method="get">
-                            <button class="btn btn-outline btn-sm" type="submit">Gestisci zone</button>
-                        </form>
-                        <form action="/theaters/{{ theater.id }}/halls/{{ hall.id }}/delete/" method="post">
-                            {% csrf_token %}
-                            <button class="btn btn-danger btn-sm" type="submit">Elimina</button>
-                        </form>
-                    </div>
+<div class="grid gap-6 lg:grid-cols-2 mt-6">
+    <div class="card p-6">
+        <h2 class="text-lg font-bold mb-4">Descrizione</h2>
+        <p class="text-slate-700 leading-relaxed">{{ theater.description|default:"Descrizione non disponibile." }}</p>
+    </div>
+    <div class="card p-6 space-y-4">
+        <div>
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-3">Contatti e info</h3>
+            <div class="grid gap-3 text-sm">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Indirizzo</p>
+                    <p class="mt-1">{{ theater.address }}, {{ theater.city }}</p>
                 </div>
-            {% empty %}
-                <p class="text-sm text-slate-600">Nessuna sala inserita.</p>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Telefono</p>
+                    <p class="mt-1">{{ theater.phone|default:"Non disponibile" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Email</p>
+                    <p class="mt-1">{{ theater.email|default:"Non disponibile" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Orari</p>
+                    <p class="mt-1">{{ theater.opening_hours|default:"Orari non disponibili" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Capienza totale</p>
+                    <p class="mt-1">{{ theater.total_seats }} posti</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="mt-8 space-y-4">
+    <div class="flex items-end justify-between gap-3">
+        <div>
+            <h2 class="text-xl font-semibold">Spettacoli in programmazione</h2>
+            <p class="text-sm text-slate-500">Le prossime performance in questo teatro.</p>
+        </div>
+    </div>
+    {% if performances %}
+        <div class="grid md:grid-cols-2 gap-4">
+            {% for performance in performances %}
+                {% include "shows/_show_card.html" with performance=performance %}
             {% endfor %}
         </div>
-    </section>
-{% endif %}
-
-<section class="space-y-3">
-    <h2 class="section-title">Programmazione</h2>
-    {% for performance in performances %}
-        <div class="card p-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h3 class="font-semibold">{{ performance.show.title }}</h3>
-                <p class="text-sm text-slate-600">{{ performance.starts_at }}</p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                {% if can_book %}
-                    <form action="/bookings/performance/{{ performance.id }}/" method="get">
-                        <button class="btn btn-primary btn-sm" type="submit">Prenota</button>
-                    </form>
-                {% elif user.is_authenticated and not can_book %}
-                    <span class="badge">Solo utenti standard</span>
-                {% else %}
-                    <form action="/accounts/login/" method="get">
-                        <button class="btn btn-outline btn-sm" type="submit">Accedi</button>
-                    </form>
-                {% endif %}
-                {% if admin_allowed or user.is_superuser %}
-                    <form action="/shows/performance/{{ performance.id }}/edit/" method="get">
-                        <button class="btn btn-ghost btn-sm" type="submit">Modifica</button>
-                    </form>
-                    <form action="/shows/performance/{{ performance.id }}/delete/" method="post">
-                        {% csrf_token %}
-                        <button class="btn btn-danger btn-sm" type="submit">Elimina</button>
-                    </form>
-                {% endif %}
-            </div>
+    {% else %}
+        <div class="card p-8 text-center">
+            <p class="text-slate-600">Nessuna performance programmata al momento.</p>
         </div>
-    {% empty %}
-        <p class="text-sm text-slate-600">Nessuna performance programmata.</p>
-    {% endfor %}
+    {% endif %}
 </section>
 {% endblock %}

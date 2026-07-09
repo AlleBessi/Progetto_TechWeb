@@ -5,40 +5,49 @@
 {% block content %}
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
     <h1 class="section-title">Gestione teatri</h1>
-    {% if user.is_superuser %}
-        <form action="/theaters/new/" method="get">
-            <button class="btn btn-primary btn-sm" type="submit">Nuovo teatro</button>
-        </form>
+    {% if can_create_delete %}
+        <a href="{% url 'theaters:create' %}" class="btn btn-primary btn-sm">Nuovo teatro</a>
     {% endif %}
 </div>
 
-<div class="grid md:grid-cols-2 gap-4">
-    {% for theater in theaters %}
-        <div class="card p-4 space-y-3">
-            <div>
-                <h2 class="font-semibold">{{ theater.name }}</h2>
-                <p class="text-sm text-slate-600">{{ theater.city }}</p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                <form action="/theaters/{{ theater.id }}/" method="get">
-                    <button class="btn btn-ghost btn-sm" type="submit">Dettagli</button>
-                </form>
-                <form action="/theaters/{{ theater.id }}/halls/new/" method="get">
-                    <button class="btn btn-outline btn-sm" type="submit">Nuova sala</button>
-                </form>
-                {% if user.is_superuser %}
-                    <form action="/theaters/{{ theater.id }}/edit/" method="get">
-                        <button class="btn btn-outline btn-sm" type="submit">Modifica</button>
-                    </form>
-                    <form action="/theaters/{{ theater.id }}/delete/" method="post">
-                        {% csrf_token %}
-                        <button class="btn btn-danger btn-sm" type="submit">Elimina</button>
-                    </form>
-                {% endif %}
-            </div>
-        </div>
-    {% empty %}
-        <p class="text-sm text-slate-600">Nessun teatro assegnato.</p>
-    {% endfor %}
+{% if theaters %}
+<div class="card overflow-x-auto">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+                <th class="px-4 py-3 text-left">Teatro</th>
+                <th class="px-4 py-3 text-left">Città</th>
+                <th class="px-4 py-3 text-right">Azioni</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200 bg-white">
+            {% for theater in theaters %}
+                <tr>
+                    <td class="px-4 py-3 font-medium text-slate-900">{{ theater.name }}</td>
+                    <td class="px-4 py-3 text-slate-600">{{ theater.city }}</td>
+                    <td class="px-4 py-3 text-right">
+                        <div class="flex flex-wrap justify-end gap-2">
+                            <a href="{% url 'theaters:management_detail' theater.id %}" class="btn btn-primary btn-sm">Gestisci teatro</a>
+                            {% if can_create_delete %}
+                                <form action="{% url 'theaters:delete' theater.id %}" method="post">
+                                    {% csrf_token %}
+                                    <button class="btn btn-danger btn-sm" type="submit"
+                                            onclick="return confirm('Eliminare {{ theater.name }}?')">
+                                        Elimina
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
+{% else %}
+<div class="card p-10 text-center space-y-2">
+    <p class="text-lg font-semibold text-slate-900">Nessun teatro</p>
+    <p class="text-sm text-slate-600">Non sei assegnato a nessun teatro da gestire.</p>
+</div>
+{% endif %}
 {% endblock %}

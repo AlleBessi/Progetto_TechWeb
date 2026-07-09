@@ -1,0 +1,76 @@
+{% extends "theaters/theater_management.html" %}
+{% load crispy_forms_tags %}
+{% load l10n %}
+
+{% block title %}Occupazione — {{ theater.name }}{% endblock %}
+
+{% block management_content %}
+<div class="space-y-4">
+    <div class="card p-5 space-y-3">
+        <div>
+            <h2 class="section-title">Seleziona performance</h2>
+            <p class="text-xs text-slate-500">Filtra e scegli una performance per aprire il cruscotto occupazione.</p>
+        </div>
+        <form method="get" class="text-sm">
+            {# show — Select2: use partial (mirrors crispy-tailwind structure) #}
+            {% include "includes/select2_field.html" with field=filter.form.show %}
+
+            {# auditorium — Select2: use partial #}
+            {% include "includes/select2_field.html" with field=filter.form.auditorium %}
+
+            {# date_from — plain DateInput: crispy handles it natively #}
+            {{ filter.form.date_from|as_crispy_field }}
+
+            {# date_to — plain DateInput: crispy handles it natively #}
+            {{ filter.form.date_to|as_crispy_field }}
+
+            {# status — SimpleSelect2: use partial #}
+            {% include "includes/select2_field.html" with field=filter.form.status %}
+
+            <button class="btn btn-primary btn-sm" type="submit">Applica filtri</button>
+        </form>
+    </div>
+
+    <div class="card p-5">
+        <div class="overflow-x-auto rounded border border-slate-200">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Spettacolo</th>
+                        <th class="px-4 py-3 text-left">Data</th>
+                        <th class="px-4 py-3 text-left">Occupazione</th>
+                        <th class="px-4 py-3 text-right">Posti</th>
+                        <th class="px-4 py-3 text-right">Azioni</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 bg-white">
+                    {% for row in performance_rows %}
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-4 py-3 font-medium text-slate-900">{{ row.performance.show.title }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ row.performance.starts_at|date:"d M Y H:i" }}</td>
+                            <td class="px-4 py-3 text-slate-600">
+                                <div class="flex items-center gap-3">
+                                    <div class="h-2 w-28 overflow-hidden rounded bg-slate-100">
+                                        <div class="h-2 rounded bg-indigo-400" style="width: {{ row.occupancy|unlocalize }}%;"></div>
+                                    </div>
+                                    <span>{{ row.occupancy }}%</span>
+                                </div>
+                            </td>
+                            <td class="px-4 py-3 text-right text-slate-900">{{ row.booked_seats }}/{{ row.total_seats }}</td>
+                            <td class="px-4 py-3 text-right">
+                                <a class="btn btn-outline btn-sm" href="{% url 'theaters:management_occupancy_detail' theater.id row.performance.id %}">Cruscotto</a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td class="px-4 py-4 text-slate-600" colspan="5">Nessuna performance disponibile.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+    {{ filter.form.media }}
+{% endblock %}

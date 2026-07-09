@@ -1,51 +1,157 @@
 {% extends "base.html" %}
-
-{% block title %}Nuova performance{% endblock %}
+{% block title %}{% if performance %}Modifica performance{% else %}Nuova performance{% endif %}{% endblock %}
 
 {% block content %}
-{% if not hall %}
-    <div class="max-w-3xl mx-auto card p-6 space-y-4">
-        <h1 class="section-title">Seleziona una sala</h1>
-        <p class="text-sm text-slate-600">Per impostare prezzi e zone, scegli prima la sala del teatro.</p>
-        <div class="grid md:grid-cols-2 gap-3">
-            {% for hall_item in halls %}
-                <div class="card p-4 flex items-center justify-between">
-                    <div>
-                        <h2 class="font-semibold">{{ hall_item.name }}</h2>
-                        <p class="text-xs text-slate-500">Posti: {{ hall_item.seats.count }}</p>
-                    </div>
-                    <form action="/shows/theater/{{ theater.id }}/performance/new/" method="get">
-                        <input type="hidden" name="hall" value="{{ hall_item.id }}">
-                        <button class="btn btn-outline btn-sm" type="submit">Scegli</button>
-                    </form>
-                </div>
-            {% empty %}
-                <p class="text-sm text-slate-600">Nessuna sala disponibile.</p>
-            {% endfor %}
-        </div>
-    </div>
-{% else %}
-    <div class="max-w-3xl mx-auto card p-6">
+<div class="max-w-5xl mx-auto space-y-6">
+    <div class="card p-6">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
-                <h1 class="section-title">Nuova performance per {{ theater.name }}</h1>
-                <p class="text-sm text-slate-600">Sala selezionata: {{ hall.name }}</p>
+                <h1 class="section-title">
+                    {% if performance %}Modifica performance{% else %}Nuova performance{% endif %}
+                </h1>
+                <p class="text-sm text-slate-600">{{ theater.name }}</p>
             </div>
-            <form action="/shows/theater/{{ theater.id }}/performance/new/" method="get">
-                <button class="btn btn-ghost btn-sm" type="submit">Cambia sala</button>
-            </form>
+            <a href="{% url 'theaters:management_detail' theater_id=theater.id %}"
+               class="btn btn-ghost btn-sm">Torna al teatro</a>
         </div>
-        <form method="post" class="space-y-4">
+
+        <form method="post" id="performance-form" class="space-y-6">
             {% csrf_token %}
-            <input type="hidden" name="hall" value="{{ hall.id }}">
-            {{ form.as_p }}
-            <div class="text-xs text-slate-500">Inserisci date multiple una per riga (YYYY-MM-DD HH:MM).</div>
-            <button class="btn btn-primary" type="submit">Crea</button>
+            {{ form.non_field_errors }}
+
+            {# ── Dettagli performance ───────────────────────────────── #}
+            <fieldset>
+                <legend class="section-title mb-3">Dettagli performance</legend>
+                <div class="grid gap-4 md:grid-cols-2">
+                    <div>
+                        {{ form.show.label_tag }}
+                        {{ form.show }}
+                        {{ form.show.errors }}
+                    </div>
+                    <div>
+                        {{ form.auditorium.label_tag }}
+                        {{ form.auditorium }}
+                        {{ form.auditorium.errors }}
+                    </div>
+                </div>
+                <div class="mt-4">
+                    {{ form.starts_at.label_tag }}
+                    {{ form.starts_at }}
+                    {{ form.starts_at.errors }}
+                </div>
+            </fieldset>
+
+            {# ── Prezzi per zona ────────────────────────────────────── #}
+            <fieldset id="zone-prices-section" class="card p-4 space-y-3 bg-slate-50/70">
+                <legend class="section-title">Prezzi per zona</legend>
+                <p class="text-xs text-slate-500">
+                    Le zone compaiono solo quando la sala selezionata ne ha di configurate.
+                </p>
+
+                <div id="zone-prices-body">
+                    {% if price_fields %}
+                        <div class="grid gap-4 md:grid-cols-2">
+                            {% for zone_label, field in price_fields %}
+                                <div class="rounded border border-slate-200 bg-white p-4">
+                                    <div class="mb-2 text-sm font-medium text-slate-900">{{ zone_label }}</div>
+                                    {{ field }}
+                                    {{ field.errors }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-sm text-slate-600">
+                            Seleziona una sala già configurata con le sue zone per inserire i prezzi.
+                        </p>
+                    {% endif %}
+                </div>
+
+                <div id="zone-prices-loading" class="hidden text-sm text-slate-500">
+                    Caricamento zone…
+                </div>
+            </fieldset>
+
+            <button class="btn btn-primary" type="submit">
+                {% if performance %}Salva{% else %}Crea{% endif %}
+            </button>
         </form>
     </div>
-{% endif %}
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
-    {{ form.media }}
+{{ form.media }}
+
+<script>
+(function ($) {
+    "use strict";
+
+    const $auditorium = $("#{{ form.auditorium.id_for_label }}");
+    const $body       = $("#zone-prices-body");
+    const $loading    = $("#zone-prices-loading");
+
+    // Build the URL by reversing via Django, then replacing the sentinel 0 with
+    // the real auditorium id at call time — keeps JS free of hardcoded paths.
+    const urlTemplate = "{% url 'shows:api_auditorium_zones' auditorium_id=0 %}"
+                            .replace("/0/", "/__ID__/");
+
+    function buildZoneField(zone) {
+        // Field name must match what PerformanceForm._add_zone_fields produces
+        // (str(zone.CodZone)) so Django can bind it on POST.
+        return $(`
+            <div class="rounded border border-slate-200 bg-white p-4">
+                <div class="mb-2 text-sm font-medium text-slate-900">${zone.label}</div>
+                <input
+                    type="number"
+                    name="${zone.code}"
+                    id="id_${zone.code}"
+                    value="0"
+                    min="0"
+                    step="0.01"
+                    class="w-full"
+                    required
+                >
+            </div>
+        `);
+    }
+
+    function showPlaceholder(msg) {
+        $body.html(`<p class="text-sm text-slate-600">${msg}</p>`);
+    }
+
+    function loadZones(auditoriumId) {
+        $body.empty();
+        $loading.removeClass("hidden");
+
+        $.getJSON(urlTemplate.replace("__ID__", auditoriumId))
+            .done(function (data) {
+                $loading.addClass("hidden");
+
+                if (!data.zones || data.zones.length === 0) {
+                    showPlaceholder("Nessuna zona configurata per questa sala.");
+                    return;
+                }
+
+                const $grid = $('<div class="grid gap-4 md:grid-cols-2"></div>');
+                data.zones.forEach(zone => $grid.append(buildZoneField(zone)));
+                $body.append($grid);
+            })
+            .fail(function (xhr) {
+                $loading.addClass("hidden");
+                const msg = xhr.responseJSON?.error ?? "Errore nel caricamento delle zone.";
+                $body.html(`<p class="text-sm text-red-600">${msg}</p>`);
+            });
+    }
+
+    $auditorium.on("change", function () {
+        const id = $(this).val();
+        if (id) {
+            loadZones(id);
+        } else {
+            showPlaceholder("Seleziona una sala già configurata con le sue zone per inserire i prezzi.");
+        }
+    });
+
+}(window.django?.jQuery ?? window.jQuery));
+</script>
 {% endblock %}

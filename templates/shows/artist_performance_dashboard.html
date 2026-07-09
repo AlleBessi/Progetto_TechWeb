@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Performance in attesa{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div>
+        <h1 class="section-title">Area artista</h1>
+        <p class="text-sm text-slate-600">Gestione delle performance in attesa di approvazione.</p>
+    </div>
+    <form action="{% url 'shows:artist_shows_dashboard' %}" method="get">
+        <button class="btn btn-outline btn-sm" type="submit">I miei spettacoli</button>
+    </form>
+</div>
+
+<div class="card p-5">
+    <div class="flex items-center justify-between gap-3 mb-4">
+        <div>
+            <h2 class="section-title">Performance in attesa</h2>
+            <p class="text-sm text-slate-600">Le performance aggiunte dai gestori restano pending finché non le confermi o rifiuti.</p>
+        </div>
+    </div>
+    <div class="overflow-x-auto rounded-2xl border border-slate-200">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                    <th class="px-4 py-3 text-left">Spettacolo</th>
+                    <th class="px-4 py-3 text-left">Teatro</th>
+                    <th class="px-4 py-3 text-left">Data</th>
+                    <th class="px-4 py-3 text-right">Azioni</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 bg-white">
+                {% for performance in pending_performances %}
+                    <tr>
+                        <td class="px-4 py-3 font-medium text-slate-900">{{ performance.show.title }}</td>
+                        <td class="px-4 py-3 text-slate-600">{{ performance.auditorium.theater.name }} · {{ performance.auditorium.name }}</td>
+                        <td class="px-4 py-3 text-slate-600">{{ performance.starts_at|date:"d/m/Y H:i" }}</td>
+                        <td class="px-4 py-3">
+                            <div class="flex flex-wrap justify-end gap-2">
+                                <form action="{% url 'shows:performance_confirm' performance.id %}" method="post">
+                                    {% csrf_token %}
+                                    <button class="btn btn-primary btn-sm" type="submit">Conferma</button>
+                                </form>
+                                <form action="{% url 'shows:performance_reject' performance.id %}" method="post">
+                                    {% csrf_token %}
+                                    <button class="btn btn-outline btn-sm" type="submit">Rifiuta</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td class="px-4 py-6 text-slate-600" colspan="4">Nessuna performance in attesa di conferma.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card overflow-x-auto mt-6">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+                <th class="px-4 py-3 text-left">Spettacolo</th>
+                <th class="px-4 py-3 text-left">Teatro</th>
+                <th class="px-4 py-3 text-left">Data</th>
+                <th class="px-4 py-3 text-left">Stato</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200 bg-white">
+            {% for performance in all_performances %}
+                <tr>
+                    <td class="px-4 py-3 font-medium text-slate-900">{{ performance.show.title }}</td>
+                    <td class="px-4 py-3 text-slate-600">{{ performance.auditorium.theater.name }} · {{ performance.auditorium.name }}</td>
+                    <td class="px-4 py-3 text-slate-600">{{ performance.starts_at|date:"d/m/Y H:i" }}</td>
+                    <td class="px-4 py-3 text-slate-600">
+                        {% if performance.status == 'scheduled' %}
+                            Approvata
+                        {% elif performance.status == 'pending_artist_confirmation' %}
+                            Non approvata
+                        {% elif performance.status == 'cancelled' %}
+                            Eliminata
+                        {% else %}
+                            {{ performance.get_status_display }}
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td class="px-4 py-6 text-slate-600" colspan="4">Nessuna performance disponibile.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

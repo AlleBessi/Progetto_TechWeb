@@ -7,6 +7,10 @@ name = "pypi"
 Django = ">=6.0,<7.0"
 Pillow = ">=10.0"
 django-select2 = "*"
+django-braces = "*"
+django-crispy-forms = "*"
+crispy-tailwind = "*"
+django-filter = "*"
 
 [dev-packages]
 

@@ -1,12 +1,12 @@
 from django.urls import path
-
+ 
 from . import views
-
+ 
 app_name = "bookings"
-
+ 
 urlpatterns = [
-    path("", views.booking_list, name="list"),
-    path("performance/<int:performance_id>/", views.performance_booking, name="performance_booking"),
-    path("<int:booking_id>/edit/", views.booking_update, name="update"),
-    path("<int:booking_id>/cancel/", views.booking_cancel, name="cancel"),
+    path("", views.BookingList.as_view(), name="booking_list"),
+    path("new/<int:performance_id>/", views.BookingCreate.as_view(), name="booking_create"),
+    path("<int:booking_id>/edit/", views.BookingUpdate.as_view(), name="booking_update"),
+    path("<int:booking_id>/cancel/", views.BookingCancel.as_view(), name="booking_cancel"),
 ]

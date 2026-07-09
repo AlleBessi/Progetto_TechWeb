@@ -1,0 +1,29 @@
+{% extends "theaters/theater_management.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}Aggiungi gestore — {{ theater.name }}{% endblock %}
+
+{% block management_content %}
+<div class="space-y-4">
+    <div class="card p-5">
+        <h2 class="section-title mb-1">Aggiungi gestore</h2>
+        <p class="text-xs text-slate-500">Assegna un gestore a {{ theater.name }}.</p>
+    </div>
+
+    <div class="card p-5">
+        <form method="post" class="text-sm">
+            {% csrf_token %}
+            {# user — ManagerSelect2Widget: use partial #}
+            {% include "includes/select2_field.html" with field=form.user only %}
+            <div class="flex gap-2">
+                <button class="btn btn-primary btn-sm" type="submit">Aggiungi</button>
+                <a class="btn btn-outline btn-sm" href="{% url 'theaters:management_admins' theater.id %}">Annulla</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+    {{ form.media }}
+{% endblock %}

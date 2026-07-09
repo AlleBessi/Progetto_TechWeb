@@ -5,6 +5,6 @@ from . import views
 app_name = "core"
 
 urlpatterns = [
-    path("", views.home, name="home"),
-    path("search/", views.search, name="search"),
+    path("", views.HomeView.as_view(), name="home"),
+    path("search/", views.SearchView.as_view(), name="search"),
 ]

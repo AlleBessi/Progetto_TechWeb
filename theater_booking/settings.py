@@ -38,6 +38,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_select2',
+    'crispy_forms',
+    'crispy_tailwind',
+    'django_filters',
     'apps.accounts.apps.AccountsConfig',
     'apps.theaters.apps.TheatersConfig',
     'apps.shows.apps.ShowsConfig',
@@ -67,7 +70,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'apps.core.context_processors.booking_permissions',
+                'apps.core.context_processors.navigation_context',
             ],
         },
     },
@@ -127,11 +130,20 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-LOGIN_URL = 'login'
+LOGIN_URL = 'accounts:login'
 LOGIN_REDIRECT_URL = 'core:home'
 LOGOUT_REDIRECT_URL = 'core:home'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+CRISPY_ALLOWED_TEMPLATE_PACKS = ("tailwind",)
+CRISPY_TEMPLATE_PACK = "tailwind"
+
+CRISPY_CLASS_CONVERTERS = {
+    "select2widget":              "select2widget django-select2",
+    "select2multiplewidget":      "select2multiplewidget django-select2",
+    "theaterselect2widget":     "theaterselect2widget django-select2",
+}
 
 # Select2 configuration
 SELECT2_JS = [

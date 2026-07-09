@@ -1,0 +1,47 @@
+{% extends "theaters/theater_management.html" %}
+
+{% block title %}Gestori — {{ theater.name }}{% endblock %}
+
+{% block management_content %}
+<div class="space-y-4">
+    <div class="card p-5">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="section-title">Gestori del teatro</h2>
+            <a class="btn btn-outline btn-sm" href="{% url 'theaters:admin_add' theater.id %}">Aggiungi gestore</a>
+        </div>
+    </div>
+
+    <div class="card p-5">
+        <div class="overflow-x-auto rounded border border-slate-200">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Gestore</th>
+                        <th class="px-4 py-3 text-left">Username</th>
+                        <th class="px-4 py-3 text-right">Azioni</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 bg-white">
+                    {% for ta in theater_admins %}
+                        <tr>
+                            <td class="px-4 py-3 font-medium text-slate-900">{{ ta.user.get_full_name|default:ta.user.username }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ ta.user.username }}</td>
+                            <td class="px-4 py-3 text-right">
+                                <form method="post" action="{% url 'theaters:admin_delete' theater.id ta.user.id %}">
+                                    {% csrf_token %}
+                                    <button
+                                        class="btn btn-danger btn-sm"
+                                        type="submit"
+                                    >Rimuovi</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td class="px-4 py-4 text-slate-600" colspan="3">Nessun gestore assegnato.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,46 +1,88 @@
+import random
 from datetime import timedelta
-from decimal import Decimal
+from io import BytesIO
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
 
-from apps.accounts.models import Profile, Role
+from PIL import Image, ImageDraw, ImageFont
+
 from apps.bookings.models import Booking, BookingSeat
-from apps.shows.models import Category, Performance, PerformanceZonePrice, Show
+from apps.shows.models import Category, Performance, PerformancePrice, Show
 from apps.theaters.models import (
-    Hall,
-    HallZone,
+    Auditorium,
+    AuditoriumZone,
+    Seat,
     Theater,
     TheaterAdmin,
-    ZONE_BALCONATA,
-    ZONE_CHOICES,
-    ZONE_GALLERIA,
-    ZONE_LOGGIONE,
-    ZONE_PLATEA,
 )
 
-ZONE_MULTIPLIERS = {
-    ZONE_PLATEA: Decimal("1.00"),
-    ZONE_GALLERIA: Decimal("0.85"),
-    ZONE_LOGGIONE: Decimal("0.70"),
-    ZONE_BALCONATA: Decimal("0.75"),
-}
+
+# Desaturated palette reused for the generated placeholder images.
+PLACEHOLDER_COLORS = [
+    (86, 104, 132),
+    (110, 130, 122),
+    (140, 118, 120),
+    (120, 116, 140),
+    (132, 124, 104),
+    (104, 128, 140),
+]
+
+
+def make_placeholder(text, index=0, size=(800, 600)):
+    """Render a simple, offline placeholder image and return it as a ContentFile."""
+    bg = PLACEHOLDER_COLORS[index % len(PLACEHOLDER_COLORS)]
+    img = Image.new("RGB", size, bg)
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font = ImageFont.load_default(size=48)
+    except TypeError:  # Pillow < 10 has no size argument
+        font = ImageFont.load_default()
+
+    bbox = draw.textbbox((0, 0), text, font=font)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    draw.text(
+        ((size[0] - tw) / 2, (size[1] - th) / 2),
+        text,
+        fill=(245, 245, 245),
+        font=font,
+    )
+
+    buffer = BytesIO()
+    img.save(buffer, format="JPEG", quality=82)
+    return ContentFile(buffer.getvalue())
 
 
 class Command(BaseCommand):
-    help = "Seed iniziale per ambiente di sviluppo."
+    help = "Seed iniziale per ambiente di sviluppo (azzera e rigenera i dati di dominio)."
 
+    @transaction.atomic
     def handle(self, *args, **options):
-        self.stdout.write("Avvio seed dati...")
+        self.stdout.write("Avvio seed dati (azzeramento e rigenerazione)...")
 
-        # Create roles
-        role_admin, _ = Role.objects.get_or_create(name=Role.ROLE_ADMIN)
-        role_artist, _ = Role.objects.get_or_create(name=Role.ROLE_ARTIST)
-        role_manager, _ = Role.objects.get_or_create(name=Role.ROLE_MANAGER)
-        role_client, _ = Role.objects.get_or_create(name=Role.ROLE_CLIENT)
+        # ── Flush existing domain data (order-safe for FK / PROTECT) ──────────
+        BookingSeat.objects.all().delete()
+        Booking.objects.all().delete()
+        PerformancePrice.objects.all().delete()
+        Performance.objects.all().delete()
+        Seat.objects.all().delete()
+        AuditoriumZone.objects.all().delete()
+        Auditorium.objects.all().delete()
+        Show.objects.all().delete()
+        Theater.objects.all().delete()
 
+        # ── Roles ─────────────────────────────────────────────────────────────
+        role_names = ["admin", "artist", "manager", "client"]
+        for role_name in role_names:
+            Group.objects.get_or_create(name=role_name)
+
+        # ── Categories ────────────────────────────────────────────────────────
         categories = ["Classico", "Commedia", "Drammatico", "Musical", "Moderno"]
         category_map = {}
         for name in categories:
@@ -50,227 +92,211 @@ class Command(BaseCommand):
             )
             category_map[name] = category
 
+        # ── Users ─────────────────────────────────────────────────────────────
         User = get_user_model()
 
-        def create_user(username, email, password, is_superuser=False, is_staff=False):
+        def create_user(username, email, password, group, is_superuser=False, is_staff=False):
             user, created = User.objects.get_or_create(
                 username=username,
                 defaults={"email": email},
             )
             if created:
                 user.set_password(password)
-                user.is_superuser = is_superuser
-                user.is_staff = is_staff or is_superuser
-                user.save()
+            user.is_superuser = is_superuser
+            user.is_staff = is_staff or is_superuser
+            user.save()
+            if group:
+                user.groups.add(Group.objects.get(name=group))
             return user
 
-        admin_user = create_user("admin", "admin@example.com", "Admin123!", is_superuser=True, is_staff=True)
-        artist_user = create_user("artista", "artista@example.com", "Artist123!")
-        manager_user = create_user("gestore", "gestore@example.com", "Gestore123!")
-        customer_user = create_user("cliente", "cliente@example.com", "Cliente123!")
+        admin_user = create_user("admin", "admin@example.com", "Admin123!", "admin", is_superuser=True, is_staff=True)
+        artist_user = create_user("artista", "artista@example.com", "Artist123!", "artist")
+        artist_user_2 = create_user("artista2", "artista2@example.com", "Artist123!", "artist")
+        manager_user = create_user("gestore", "gestore@example.com", "Gestore123!", "manager")
+        # A second manager left intentionally without any theater assignment,
+        # to exercise the "Nessun teatro" empty state.
+        manager_unassigned = create_user("gestore2", "gestore2@example.com", "Gestore123!", "manager")
+        customer_user = create_user("cliente", "cliente@example.com", "Cliente123!", "client")
 
-        def ensure_profile(user, role, city="", latitude=None, longitude=None, interests=None, display_name=""):
-            profile, _ = Profile.objects.get_or_create(user=user)
-            profile.role = role
-            profile.city = city
-            profile.latitude = latitude
-            profile.longitude = longitude
-            profile.display_name = display_name
-            profile.save()
-            if interests is not None:
-                profile.interests.set(interests)
-            return profile
+        client_specs = [
+            ("cliente2", "cliente2@example.com"),
+            ("cliente3", "cliente3@example.com"),
+            ("cliente4", "cliente4@example.com"),
+            ("cliente5", "cliente5@example.com"),
+            ("cliente6", "cliente6@example.com"),
+        ]
+        extra_customers = [
+            create_user(username, email, "Cliente123!", "client")
+            for username, email in client_specs
+        ]
 
-        ensure_profile(
-            artist_user,
-            role=role_artist,
-            city="Roma",
-            interests=[category_map["Commedia"], category_map["Drammatico"]],
-            display_name="Artista Demo",
-        )
-        ensure_profile(
-            customer_user,
-            role=role_client,
-            city="Milano",
-            latitude=45.4642,
-            longitude=9.1900,
-            interests=[category_map["Musical"], category_map["Moderno"]],
-            display_name="Cliente Demo",
-        )
-        ensure_profile(manager_user, role=role_manager, city="Milano", display_name="Gestore Demo")
-        ensure_profile(admin_user, role=role_admin, city="Milano", display_name="Admin Demo")
+        artists = [artist_user, artist_user_2]
 
-        theater_centrale, _ = Theater.objects.get_or_create(
-            name="Teatro Centrale",
-            defaults={
-                "description": "Teatro storico nel centro cittadino.",
-                "address": "Via Roma 10",
-                "city": "Milano",
-                "province": "MI",
-                "postal_code": "20121",
-                "latitude": 45.4685,
-                "longitude": 9.1824,
-            },
-        )
-        theater_aurora, _ = Theater.objects.get_or_create(
-            name="Teatro Aurora",
-            defaults={
-                "description": "Spazio moderno per eventi e musical.",
-                "address": "Corso Torino 45",
-                "city": "Torino",
-                "province": "TO",
-                "postal_code": "10121",
-                "latitude": 45.0703,
-                "longitude": 7.6869,
-            },
-        )
+        # ── Theaters (5) ──────────────────────────────────────────────────────
+        theater_specs = [
+            ("Teatro Centrale", "Teatro storico nel centro cittadino.", "Via Roma 10", "Milano", "MI", "20121", 45.4685, 9.1824),
+            ("Teatro Aurora", "Spazio moderno per eventi e musical.", "Corso Torino 45", "Torino", "TO", "10121", 45.0703, 7.6869),
+            ("Teatro Verdi", "Elegante sala ottocentesca affacciata sull'Arno.", "Via Ghibellina 99", "Firenze", "FI", "50122", 43.7696, 11.2558),
+            ("Teatro Massimo", "Grande teatro lirico nel cuore della città.", "Piazza Verdi 1", "Palermo", "PA", "90138", 38.1206, 13.3565),
+            ("Teatro La Fenice", "Prestigioso teatro affacciato sui canali.", "Campo San Fantin 1965", "Venezia", "VE", "30124", 45.4337, 12.3339),
+        ]
 
-        hall_centrale, _ = Hall.objects.get_or_create(
-            theater=theater_centrale,
-            name="Sala A",
-            defaults={"seat_rows": 8, "seat_cols": 10},
-        )
-        hall_aurora, _ = Hall.objects.get_or_create(
-            theater=theater_aurora,
-            name="Sala B",
-            defaults={"seat_rows": 10, "seat_cols": 12},
-        )
-
-        HallZone.objects.get_or_create(
-            hall=hall_centrale,
-            zone=ZONE_PLATEA,
-            defaults={"rows": 4, "seats_per_row": 10, "order": 1},
-        )
-        HallZone.objects.get_or_create(
-            hall=hall_centrale,
-            zone=ZONE_GALLERIA,
-            defaults={"rows": 3, "seats_per_row": 8, "order": 2},
-        )
-        HallZone.objects.get_or_create(
-            hall=hall_centrale,
-            zone=ZONE_LOGGIONE,
-            defaults={"rows": 2, "seats_per_row": 6, "order": 3},
-        )
-
-        HallZone.objects.get_or_create(
-            hall=hall_aurora,
-            zone=ZONE_PLATEA,
-            defaults={"rows": 5, "seats_per_row": 12, "order": 1},
-        )
-        HallZone.objects.get_or_create(
-            hall=hall_aurora,
-            zone=ZONE_GALLERIA,
-            defaults={"rows": 3, "seats_per_row": 10, "order": 2},
-        )
-        HallZone.objects.get_or_create(
-            hall=hall_aurora,
-            zone=ZONE_LOGGIONE,
-            defaults={"rows": 2, "seats_per_row": 8, "order": 3},
-        )
-
-        Booking.objects.all().delete()
-
-        hall_centrale.regenerate_seats()
-        hall_aurora.regenerate_seats()
-
-        TheaterAdmin.objects.get_or_create(theater=theater_centrale, user=manager_user)
-
-        show_commedia, _ = Show.objects.get_or_create(
-            title="La commedia degli errori",
-            defaults={
-                "description": "Una commedia brillante tra scambi di identita e ritmo serrato.",
-                "category": category_map["Commedia"],
-                "duration_minutes": 110,
-                "created_by": artist_user,
-                "status": Show.STATUS_APPROVED,
-            },
-        )
-        show_commedia.artists.add(artist_user)
-
-        show_musical, _ = Show.objects.get_or_create(
-            title="Note di Mezzanotte",
-            defaults={
-                "description": "Musical contemporaneo con orchestra dal vivo.",
-                "category": category_map["Musical"],
-                "duration_minutes": 130,
-                "created_by": artist_user,
-                "status": Show.STATUS_APPROVED,
-            },
-        )
-        show_musical.artists.add(artist_user)
-
-        def future_datetime(days, hour, minute):
-            base = timezone.localtime(timezone.now()).replace(
-                hour=hour, minute=minute, second=0, microsecond=0
+        theaters = []
+        for i, (name, desc, addr, city, prov, cap, lat, lng) in enumerate(theater_specs):
+            theater = Theater.objects.create(
+                name=name,
+                description=desc,
+                address=addr,
+                city=city,
+                province=prov,
+                postal_code=cap,
+                phone="0" + str(1000000 + i),
+                email=f"info@{slugify(name)}.example.com",
+                opening_hours="Mar-Dom 10:00-19:00",
+                latitude=lat,
+                longitude=lng,
             )
-            return base + timedelta(days=days)
+            theater.photo.save(f"{slugify(name)}.jpg", make_placeholder(name, i), save=True)
+            theaters.append(theater)
 
-        performance_one, _ = Performance.objects.get_or_create(
-            show=show_commedia,
-            theater=theater_centrale,
-            hall=theater_centrale.halls.first(),
-            starts_at=future_datetime(7, 20, 30),
-            defaults={
-                "base_price": 25.00,
-                "status": Performance.STATUS_SCHEDULED,
-                "created_by": manager_user,
-            },
-        )
-        Performance.objects.get_or_create(
-            show=show_musical,
-            theater=theater_aurora,
-            hall=theater_aurora.halls.first(),
-            starts_at=future_datetime(10, 21, 0),
-            defaults={
-                "base_price": 30.00,
-                "status": Performance.STATUS_SCHEDULED,
-                "created_by": manager_user,
-            },
-        )
+        # ── Auditoriums + zones + seats ───────────────────────────────────────
+        zone_defs = [
+            ("Platea", 5, 12, 1),
+            ("Galleria", 3, 10, 2),
+            ("Loggione", 2, 8, 3),
+        ]
 
-        booking, created = Booking.objects.get_or_create(
-            user=customer_user,
-            performance=performance_one,
-            defaults={"status": Booking.STATUS_CONFIRMED},
-        )
+        auditoriums = []
+        for i, theater in enumerate(theaters):
+            # Every theater has a main hall; the first two also get a second, smaller hall.
+            hall_names = ["Sala Grande"]
+            if i < 2:
+                hall_names.append("Sala Piccola")
+            for hall_name in hall_names:
+                auditorium = Auditorium.objects.create(theater=theater, name=hall_name)
+                for zone_name, rows, spr, order in zone_defs:
+                    AuditoriumZone.objects.create(
+                        auditorium=auditorium,
+                        zone=zone_name,
+                        rows=rows,
+                        seats_per_row=spr,
+                        order=order,
+                    )
+                auditorium.regenerate_seats()
+                auditoriums.append(auditorium)
 
-        for performance in Performance.objects.all():
-            hall_zones = list(performance.hall.zones.values_list("zone", flat=True))
-            zones = hall_zones or [zone for zone, _label in ZONE_CHOICES]
-            base_price = Decimal(str(performance.base_price))
-            for zone in zones:
-                multiplier = ZONE_MULTIPLIERS.get(zone, Decimal("1.00"))
-                price = (base_price * multiplier).quantize(Decimal("0.01"))
-                PerformanceZonePrice.objects.get_or_create(
+        # ── Manager assignments ───────────────────────────────────────────────
+        for theater in theaters[:3]:
+            TheaterAdmin.objects.get_or_create(theater=theater, user=manager_user)
+
+        # ── Shows (6) with poster + cover ─────────────────────────────────────
+        show_specs = [
+            ("La commedia degli errori", "Una commedia brillante tra scambi di identità e ritmo serrato.", "Commedia", 110),
+            ("Note di Mezzanotte", "Musical contemporaneo con orchestra dal vivo.", "Musical", 130),
+            ("Amleto", "Il grande classico shakespeariano in una nuova regia.", "Drammatico", 160),
+            ("Il flauto magico", "Opera senza tempo tra magia e simbolismo.", "Classico", 145),
+            ("Cabaret Moderno", "Spettacolo di varietà con sguardo contemporaneo.", "Moderno", 95),
+            ("Sogno di una notte", "Fiaba corale ricca di equivoci e incanti.", "Commedia", 120),
+        ]
+
+        shows = []
+        for i, (title, desc, cat, duration) in enumerate(show_specs):
+            show = Show.objects.create(
+                artist=artists[i % len(artists)],
+                title=title,
+                description=desc,
+                category=category_map[cat],
+                duration_minutes=duration,
+            )
+            show.poster.save(f"{slugify(title)}-poster.jpg", make_placeholder(title, i), save=True)
+            show.cover.save(f"{slugify(title)}-cover.jpg", make_placeholder(title, i + 3, size=(1200, 400)), save=True)
+            shows.append(show)
+
+        # ── Performances (24) spread across theaters and dates ────────────────
+        performances = []
+        base = timezone.localtime(timezone.now()).replace(minute=0, second=0, microsecond=0)
+        hours = [18, 20, 21]
+        for i in range(24):
+            show = shows[i % len(shows)]
+            auditorium = auditoriums[i % len(auditoriums)]
+            starts_at = (base + timedelta(days=3 + i)).replace(hour=hours[i % len(hours)], minute=30)
+            performance = Performance.objects.create(
+                show=show,
+                auditorium=auditorium,
+                starts_at=starts_at,
+                status=Performance.STATUS_SCHEDULED,
+                confirmed_by_artist=True,
+                confirmed_by_artist_at=timezone.now(),
+                created_by=manager_user,
+            )
+            performances.append(performance)
+
+            zones = list(auditorium.zones.order_by("order", "id"))
+            for index, zone in enumerate(zones, start=1):
+                PerformancePrice.objects.create(
                     performance=performance,
-                    zone=zone,
-                    defaults={"price": price},
+                    auditorium_zone=zone,
+                    price=18 + index * 6,
                 )
 
-        if created:
-            reserved_ids = BookingSeat.objects.filter(
-                performance=performance_one,
-                booking__status=Booking.STATUS_CONFIRMED,
-            ).values_list("seat_id", flat=True)
-            available_seats = (
-                performance_one.hall.seats.exclude(id__in=reserved_ids)
-                .order_by("row", "number")
-                .all()[:2]
+        # ── Bookings ───────────────────────────────────────────────────────────
+        # reserved_by_performance tracks which seats are already taken per
+        # performance, across every customer, to respect BookingSeat's
+        # unique_together("performance", "seat") constraint.
+        reserved_by_performance: dict[int, set[int]] = {p.id: set() for p in performances}
+        rng = random.Random(20260708)
+
+        def create_booking(user, performance, seat_count):
+            reserved = reserved_by_performance[performance.id]
+            available = [
+                seat for seat in performance.auditorium.seats.order_by("row", "number")
+                if seat.id not in reserved
+            ]
+            if not available:
+                return None
+            rng.shuffle(available)
+            seats = available[:seat_count]
+
+            booking = Booking.objects.create(
+                user=user,
+                performance=performance,
+                status=Booking.STATUS_CONFIRMED,
             )
             total = 0
-            for seat in available_seats:
-                price = performance_one.zone_price(seat.zone)
+            for seat in seats:
+                price = performance.zone_price(seat.auditorium_zone)
                 BookingSeat.objects.create(
                     booking=booking,
-                    performance=performance_one,
+                    performance=performance,
                     seat=seat,
                     price_at_purchase=price,
                 )
+                reserved.add(seat.id)
                 total += price
             booking.total_price = total
             booking.save(update_fields=["total_price"])
+            return booking
+
+        # A few confirmed bookings for the original demo customer.
+        for performance in performances[:3]:
+            create_booking(customer_user, performance, seat_count=2)
+
+        # Each additional client gets between 4 and 7 bookings on random performances.
+        total_extra_bookings = 0
+        for client in extra_customers:
+            booking_count = rng.randint(4, 7)
+            chosen_performances = rng.sample(performances, k=booking_count)
+            for performance in chosen_performances:
+                if create_booking(client, performance, seat_count=rng.randint(1, 3)):
+                    total_extra_bookings += 1
 
         self.stdout.write(self.style.SUCCESS("Seed completato."))
         self.stdout.write(
-            "Utenti demo (password iniziali): admin/Admin123!, artista/Artist123!, gestore/Gestore123!, cliente/Cliente123!"
+            f"Teatri: {len(theaters)} • Spettacoli: {len(shows)} • Performance: {len(performances)} • "
+            f"Prenotazioni clienti extra: {total_extra_bookings}"
+        )
+        self.stdout.write(
+            "Utenti demo: admin/Admin123!, artista/Artist123!, artista2/Artist123!, "
+            "gestore/Gestore123! (assegnato), gestore2/Gestore123! (nessun teatro), "
+            "cliente/Cliente123!, cliente2..6/Cliente123! (4-7 prenotazioni ciascuno)"
         )

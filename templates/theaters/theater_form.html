@@ -1,13 +1,14 @@
 {% extends "base.html" %}
+{% load crispy_forms_tags %}
 
 {% block title %}Nuovo teatro{% endblock %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto card p-6">
     <h1 class="section-title mb-4">{% if theater %}Modifica teatro{% else %}Nuovo teatro{% endif %}</h1>
-    <form method="post" class="space-y-4">
+    <form method="post" class="space-y-4" enctype="multipart/form-data">
         {% csrf_token %}
-        {{ form.as_p }}
+        {{ form|crispy }}
         <button class="btn btn-primary" type="submit">{% if theater %}Salva{% else %}Crea teatro{% endif %}</button>
     </form>
 </div>

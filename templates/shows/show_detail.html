@@ -3,144 +3,95 @@
 {% block title %}{{ show.title }}{% endblock %}
 
 {% block content %}
-<!-- Hero Section with Cover Image -->
-<div class="mb-8">
-    <div class="card overflow-hidden">
-        <div class="relative h-96 bg-gradient-to-br from-slate-200 to-slate-300">
-            {% if show.cover %}
-                <img class="w-full h-full object-cover" src="{{ show.cover.url }}" alt="{{ show.title }}">
-            {% elif show.poster %}
-                <img class="w-full h-full object-cover" src="{{ show.poster.url }}" alt="{{ show.title }}">
-            {% else %}
-                <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-blue-200">
-                    <span class="text-slate-400">Nessuna immagine disponibile</span>
-                </div>
-            {% endif %}
-            <!-- Overlay with gradient -->
-            <div class="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent"></div>
-            
-            <!-- Title overlay -->
-            <div class="absolute bottom-0 left-0 right-0 p-6">
-                <h1 class="text-4xl font-bold text-white mb-2">{{ show.title }}</h1>
-                <div class="flex flex-wrap gap-2 items-center">
-                    <span class="badge bg-white text-slate-900">{{ show.category.name }}</span>
-                    <span class="text-white text-sm">⏱ {{ show.duration_minutes }} minuti</span>
-                </div>
+<div class="card overflow-hidden">
+    <div class="relative h-80 bg-gradient-to-br from-slate-200 to-slate-300">
+        {% if show.cover %}
+            <img class="w-full h-full object-cover" src="{{ show.cover.url }}" alt="{{ show.title }}">
+        {% elif show.poster %}
+            <img class="w-full h-full object-cover" src="{{ show.poster.url }}" alt="{{ show.title }}">
+        {% else %}
+            <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-blue-200">
+                <span class="text-slate-400">Nessuna immagine disponibile</span>
+            </div>
+        {% endif %}
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent"></div>
+        <div class="absolute bottom-0 left-0 right-0 p-6">
+            <h1 class="text-3xl font-bold text-white mb-2">{{ show.title }}</h1>
+            <div class="flex flex-wrap gap-2 items-center">
+                <span class="badge bg-white text-slate-900">{{ show.category.name }}</span>
+                <span class="text-white text-sm">⏱ {{ show.duration_minutes }} minuti</span>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Show Info Grid -->
-<div class="grid md:grid-cols-3 gap-6 mb-8">
-    <!-- Main info -->
-    <div class="md:col-span-2">
-        <div class="card p-6">
-            <h2 class="text-lg font-bold mb-4">Descrizione</h2>
-            <p class="text-slate-700 leading-relaxed">{{ show.description }}</p>
-        </div>
+<div class="grid gap-6 lg:grid-cols-2 mt-6">
+    <div class="card p-6">
+        <h2 class="text-lg font-bold mb-4">Descrizione</h2>
+        <p class="text-slate-700 leading-relaxed">{{ show.description }}</p>
     </div>
 
-    <!-- Side Info -->
-    <div class="space-y-4">
-        <!-- Artists Card -->
-        <div class="card p-4">
-            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-3">Artisti</h3>
-            <div class="space-y-2">
-                {% for artist in show.artists.all %}
-                    <div class="flex items-center gap-2 p-2 bg-blue-50 rounded">
-                        <span class="text-blue-600">👤</span>
-                        <span class="text-sm font-medium">
-                            {{ artist.get_full_name|default:artist.username }}
-                        </span>
-                    </div>
-                {% empty %}
-                    <p class="text-xs text-slate-500">Nessun artista assegnato</p>
-                {% endfor %}
-            </div>
-        </div>
-
-        <!-- Category & Duration Info -->
-        <div class="card p-4">
-            <div class="space-y-3">
+    <div class="card p-6 space-y-4">
+        <div>
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-3">Informazioni</h3>
+            <div class="grid gap-3 text-sm">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Categoria</p>
-                    <p class="text-sm mt-1">{{ show.category.name }}</p>
+                    <p class="mt-1">{{ show.category.name }}</p>
                 </div>
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Durata</p>
-                    <p class="text-sm mt-1">{{ show.duration_minutes }} minuti</p>
+                    <p class="mt-1">{{ show.duration_minutes }} minuti</p>
                 </div>
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Stato</p>
-                    <p class="text-sm mt-1">
-                        <span class="badge">{{ show.get_status_display }}</span>
-                    </p>
-                </div>
+            </div>
+        </div>
+        <div>
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-3">Artista</h3>
+            <div class="flex items-center gap-2 rounded border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                <span class="text-slate-500">👤</span>
+                <span>{{ show.artist.get_full_name|default:show.artist.username }}</span>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Performances Section -->
-<section class="mb-8">
-    <h2 class="text-2xl font-bold mb-4">Prossime date</h2>
+<section class="mt-8 space-y-4">
+    <div class="flex items-end justify-between gap-3">
+        <div>
+            <h2 class="text-xl font-semibold">Prossime date</h2>
+            <p class="text-sm text-slate-500">Scegli la performance e prenota i posti disponibili.</p>
+        </div>
+    </div>
     {% if performances %}
-        <div class="grid gap-4">
+        <div class="space-y-3">
             {% for performance in performances %}
-                <div class="card p-4 hover:shadow-lg transition-shadow duration-300">
-                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <!-- Performance Info -->
-                        <div class="flex-1">
-                            <div class="flex flex-col gap-2">
-                                <!-- Theater -->
-                                <div class="flex items-center gap-2">
-                                    <span class="text-lg">🎭</span>
-                                    <div>
-                                        <p class="font-semibold">{{ performance.theater.name }}</p>
-                                        <p class="text-xs text-slate-500">{{ performance.theater.city }}</p>
-                                    </div>
-                                </div>
-
-                                <!-- Date & Time -->
-                                <div class="flex items-center gap-2 text-slate-700">
-                                    <span>📅</span>
-                                    <span class="text-sm">
-                                        {{ performance.starts_at|date:"d M Y" }} 
-                                        alle {{ performance.starts_at|time:"H:i" }}
-                                    </span>
-                                </div>
-
-                                <!-- Hall Info -->
-                                <div class="flex items-center gap-2 text-slate-600">
-                                    <span>📍</span>
-                                    <span class="text-sm">{{ performance.hall.name }}</span>
-                                </div>
-
-                                <!-- Base Price -->
-                                <div class="flex items-center gap-2">
-                                    <span>💰</span>
-                                    <span class="font-semibold text-green-600">
-                                        da € {{ performance.base_price|floatformat:2 }}
-                                    </span>
-                                </div>
-                            </div>
+                <div class="card p-4 flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex flex-wrap items-center gap-4">
+                        <div class="flex flex-col">
+                            <span class="text-xs uppercase tracking-wide text-slate-500">Data</span>
+                            <span class="text-lg font-semibold text-slate-900">{{ performance.starts_at|date:"d M Y" }}</span>
+                            <span class="text-sm text-slate-600">{{ performance.starts_at|time:"H:i" }}</span>
                         </div>
-
-                        <!-- Action Button -->
-                        <div class="md:w-auto">
-                            {% if can_book %}
-                                <form action="/bookings/performance/{{ performance.id }}/" method="get">
-                                    <button class="btn btn-primary btn-sm" type="submit">Prenota ora</button>
-                                </form>
-                            {% elif user.is_authenticated and not can_book %}
-                                <span class="badge bg-slate-100 text-slate-700">Solo utenti standard</span>
-                            {% else %}
-                                <form action="/accounts/login/" method="get">
-                                    <button class="btn btn-outline btn-sm" type="submit">Accedi</button>
-                                </form>
-                            {% endif %}
+                        <div class="h-10 w-px bg-slate-200 hidden sm:block"></div>
+                        <div class="flex flex-col">
+                            <span class="text-xs uppercase tracking-wide text-slate-500">Teatro</span>
+                            <span class="text-slate-900 font-medium">{{ performance.auditorium.theater.name }}</span>
+                            <span class="text-sm text-slate-600">Sala {{ performance.auditorium.name }}</span>
                         </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <span class="text-sm text-slate-600">Prezzi per zona disponibili</span>
+                        {% if can_book %}
+                            <form action="{% url 'bookings:booking_create' performance.id %}" method="get">
+                                <button class="btn btn-primary btn-sm" type="submit">Prenota</button>
+                            </form>
+                        {% elif user.is_authenticated and not can_book %}
+                            <span class="badge">Solo utenti standard</span>
+                        {% else %}
+                            <form action="{% url 'accounts:login' %}" method="get">
+                                <button class="btn btn-outline btn-sm" type="submit">Accedi</button>
+                            </form>
+                        {% endif %}
                     </div>
                 </div>
             {% endfor %}
@@ -152,9 +103,8 @@
     {% endif %}
 </section>
 
-<!-- Back Button -->
 <div>
-    <form action="/shows/" method="get">
+    <form action="{% url 'shows:list' %}" method="get">
         <button class="btn btn-outline btn-sm" type="submit">← Torna agli spettacoli</button>
     </form>
 </div>

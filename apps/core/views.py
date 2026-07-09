@@ -1,111 +1,134 @@
-import math
-
-from django.db.models import Q
-from django.shortcuts import render
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Count
+from django.views.generic import TemplateView
+from django_filters.views import FilterView
 from django.utils import timezone
 
 from apps.bookings.models import Booking
 from apps.shows.models import Performance
 from apps.theaters.models import Theater
 
-from .forms import SearchForm
+from .filters import PerformanceFilter
 
 
-def _haversine_km(lat1, lon1, lat2, lon2):
-	radius = 6371
-	lat1_rad = math.radians(lat1)
-	lon1_rad = math.radians(lon1)
-	lat2_rad = math.radians(lat2)
-	lon2_rad = math.radians(lon2)
-	dlat = lat2_rad - lat1_rad
-	dlon = lon2_rad - lon1_rad
-	a = math.sin(dlat / 2) ** 2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2) ** 2
-	c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-	return radius * c
+def _recommended_performances(user, base_qs, limit=4):
+	"""Personalised homepage suggestions, ranked by relevance.
 
+	Recommends upcoming shows the user is likely to enjoy, scored (in priority
+	order) by:
+	  1. Personal affinity — how often the user has booked the show's category
+	     and artist before (frequency-weighted, category above artist).
+	  2. Global popularity — confirmed bookings for the show (trending signal),
+	     used as a tie-breaker.
+	  3. Soonest date, as the final tie-breaker.
 
-def _recommended_performances(user, base_qs):
-	if not user.is_authenticated:
-		return base_qs.none()
+	Shows the user has already booked are excluded. Returns [] when there is no
+	personalisation signal (anonymous users, or users without booking history),
+	so the section only appears when it is genuinely personalised — and stays
+	distinct from the chronological "Prossime performance" list.
 
-	interests = list(user.profile.interests.all())
-	if interests:
-		qs = base_qs.filter(show__category__in=interests)
-	else:
-		booked_categories = (
-			Booking.objects.filter(user=user, status=Booking.STATUS_CONFIRMED)
-			.values_list("performance__show__category", flat=True)
-			.distinct()
-		)
-		qs = base_qs.filter(show__category__in=booked_categories)
-
-	qs = qs.exclude(bookings__user=user)
-	return qs.distinct()[:6]
-
-
-def _nearby_theaters(user):
+	Runs in a bounded number of queries (the user's history, one popularity
+	aggregate) beyond the already-evaluated candidate list.
+	"""
 	if not user.is_authenticated:
 		return []
-	profile = user.profile
-	if profile.latitude is None or profile.longitude is None:
+
+	# Personal affinity signals, derived from the user's confirmed bookings.
+	category_weights: dict[int, int] = {}
+	artist_weights: dict[int, int] = {}
+	booked_show_ids: set[int] = set()
+	history = Booking.objects.filter(
+		user=user, status=Booking.STATUS_CONFIRMED
+	).values_list(
+		"performance__show_id",
+		"performance__show__category_id",
+		"performance__show__artist_id",
+	)
+	for show_id, category_id, artist_id in history:
+		booked_show_ids.add(show_id)
+		category_weights[category_id] = category_weights.get(category_id, 0) + 1
+		artist_weights[artist_id] = artist_weights.get(artist_id, 0) + 1
+
+	if not booked_show_ids:
+		return []  # no history → nothing to personalise on
+
+	# Soonest upcoming performance per not-yet-booked show (base_qs is ordered by
+	# starts_at), so a single show cannot fill every recommendation slot.
+	perf_by_show: dict[int, Performance] = {}
+	for performance in base_qs:
+		if performance.show_id in booked_show_ids:
+			continue  # don't recommend a show the user has already booked
+		perf_by_show.setdefault(performance.show_id, performance)
+	if not perf_by_show:
 		return []
-	theaters = Theater.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True)
-	with_distance = []
-	for theater in theaters:
-		distance = _haversine_km(
-			float(profile.latitude),
-			float(profile.longitude),
-			float(theater.latitude),
-			float(theater.longitude),
+
+	candidate_show_ids = list(perf_by_show)
+
+	# Global popularity: confirmed bookings per candidate show (one aggregate).
+	popularity = dict(
+		Booking.objects.filter(
+			status=Booking.STATUS_CONFIRMED,
+			performance__show__in=candidate_show_ids,
 		)
-		with_distance.append((distance, theater))
-	with_distance.sort(key=lambda item: item[0])
-	return with_distance[:5]
-
-
-def home(request):
-	now = timezone.now()
-	upcoming = (
-		Performance.objects.filter(starts_at__gte=now, status=Performance.STATUS_SCHEDULED)
-		.select_related("show", "theater")
-		.order_by("starts_at")
-	)
-	recommendations = _recommended_performances(request.user, upcoming)
-	nearby = _nearby_theaters(request.user)
-
-	return render(
-		request,
-		"core/home.html",
-		{
-			"performances": upcoming[:12],
-			"recommendations": recommendations,
-			"nearby": nearby,
-		},
+		.values("performance__show")
+		.annotate(n=Count("id"))
+		.values_list("performance__show", "n")
 	)
 
+	scored = []
+	for show_id, performance in perf_by_show.items():
+		show = performance.show
+		affinity = category_weights.get(show.category_id, 0) * 3 + artist_weights.get(show.artist_id, 0) * 2
+		# Sort key: affinity first, then popularity, then soonest date. Using a
+		# tuple guarantees affinity always dominates popularity regardless of scale.
+		scored.append((affinity, popularity.get(show_id, 0), performance.starts_at, performance))
 
-def search(request):
-	form = SearchForm(request.GET or None)
-	qs = Performance.objects.filter(
-		status=Performance.STATUS_SCHEDULED,
-		starts_at__gte=timezone.now(),
-	).select_related("show", "theater")
-	if form.is_valid():
-		q = form.cleaned_data.get("q")
-		category = form.cleaned_data.get("category")
-		city = form.cleaned_data.get("city")
-		date_from = form.cleaned_data.get("date_from")
-		date_to = form.cleaned_data.get("date_to")
+	scored.sort(key=lambda item: (-item[0], -item[1], item[2]))
+	return [performance for *_ignored, performance in scored[:limit]]
 
-		if q:
-			qs = qs.filter(Q(show__title__icontains=q) | Q(show__description__icontains=q) | Q(theater__name__icontains=q))
-		if category:
-			qs = qs.filter(show__category=category)
-		if city:
-			qs = qs.filter(theater__city__icontains=city)
-		if date_from:
-			qs = qs.filter(starts_at__date__gte=date_from)
-		if date_to:
-			qs = qs.filter(starts_at__date__lte=date_to)
 
-	return render(request, "core/search.html", {"form": form, "performances": qs})
+def _featured_theaters():
+	return Theater.objects.order_by("name")[:5]
+
+
+class HomeView(TemplateView):
+	template_name = "core/home.html"
+
+	def get_context_data(self, **kwargs):
+		context = super().get_context_data(**kwargs)
+		now = timezone.now()
+		# Evaluate the upcoming performances once and reuse for both sections.
+		upcoming = list(
+			Performance.objects.filter(starts_at__gte=now, status=Performance.STATUS_SCHEDULED)
+			.select_related("show", "show__artist", "auditorium__theater")
+			.order_by("starts_at")
+		)
+		# Chronological list: keep only the soonest performance per show so the
+		# same show is not shown several times.
+		upcoming_by_show: dict[int, Performance] = {}
+		for performance in upcoming:
+			upcoming_by_show.setdefault(performance.show_id, performance)
+		distinct_upcoming = list(upcoming_by_show.values())
+
+		recommendations = _recommended_performances(self.request.user, upcoming)
+
+		context.update(
+			{
+				"performances": distinct_upcoming[:4],
+				"recommendations": recommendations,
+				"featured_theaters": _featured_theaters(),
+			}
+		)
+		return context
+
+
+class SearchView(FilterView):
+	template_name = "core/search.html"
+	filterset_class = PerformanceFilter
+	context_object_name = "performances"
+
+	def get_queryset(self):
+		return (
+			Performance.objects.filter(status=Performance.STATUS_SCHEDULED, starts_at__gte=timezone.now())
+			.select_related("show", "show__artist", "auditorium__theater")
+		)

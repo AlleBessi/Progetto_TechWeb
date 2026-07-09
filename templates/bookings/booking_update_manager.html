@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% load l10n %}
+
+{% block title %}Modifica prenotazione{% endblock %}
+
+{% block content %}
+<div class="card p-6 mb-6 space-y-2">
+    <h1 class="section-title">Modifica prenotazione cliente</h1>
+    <p class="text-sm text-slate-600">Cliente: {{ booking.user.get_full_name|default:booking.user.username }}</p>
+    <p class="text-xs text-slate-500">{{ performance.show.title }} • {{ performance.starts_at|date:"d M Y" }} {{ performance.starts_at|time:"H:i" }} • {{ performance.auditorium.name }}</p>
+</div>
+
+<form method="post" class="space-y-6">
+    {% csrf_token %}
+    {% if form.errors %}
+        <div class="card px-4 py-2 text-sm text-red-700">Seleziona almeno un posto disponibile.</div>
+    {% endif %}
+
+    <div class="card p-4">
+        <div class="stage mb-4">Palco</div>
+        <div class="flex flex-wrap gap-3 text-xs mb-4">
+            {% for zone in zone_layout %}
+                <div class="flex items-center gap-2">
+                    <span class="seat {{ zone.color_class }}">
+                        <span class="seat-label">{{ zone.label|slice:":1" }}</span>
+                    </span>
+                    <span>{{ zone.label }} - {{ zone.price }} EUR</span>
+                </div>
+            {% endfor %}
+            <div class="flex items-center gap-2">
+                <span class="seat"><span class="seat-label seat-reserved">X</span></span>
+                <span>Occupato</span>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            {% for zone in zone_layout %}
+                <div class="card p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h3 class="section-title">{{ zone.label }}</h3>
+                        <span class="badge">{{ zone.price }} EUR</span>
+                    </div>
+                    <div class="space-y-2">
+                        {% for row, seats in zone.rows %}
+                            <div class="seat-row">
+                                <span class="w-6 text-xs text-slate-500">{{ row }}</span>
+                                {% for item in seats %}
+                                    {% if item.is_reserved %}
+                                        <span class="seat"><span class="seat-label seat-reserved">{{ item.seat.number }}</span></span>
+                                    {% else %}
+                                        <label class="seat {{ zone.color_class }} cursor-pointer">
+                                            <input class="seat-input" type="checkbox" name="seats" value="{{ item.seat.id }}" data-price="{{ item.price|unlocalize }}" {% if item.is_selected %}checked{% endif %}>
+                                            <span class="seat-label">{{ item.seat.number }}</span>
+                                        </label>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card p-4 flex items-center justify-between">
+        <span class="text-sm font-medium text-slate-600">Totale</span>
+        <span id="booking-total" class="text-lg font-semibold text-slate-900">€ 0.00</span>
+    </div>
+
+    <div class="flex flex-wrap gap-2">
+        <a class="btn btn-ghost btn-sm" href="{% url 'theaters:management_bookings' theater.id %}">Torna alle prenotazioni</a>
+        <button class="btn btn-primary btn-sm" type="submit">Salva modifiche</button>
+    </div>
+</form>
+
+<script>
+(function () {
+    const totalEl = document.getElementById("booking-total");
+    const inputs = document.querySelectorAll(".seat-input");
+    function update() {
+        let total = 0;
+        inputs.forEach(function (i) {
+            if (i.checked) total += parseFloat(i.dataset.price || "0");
+        });
+        totalEl.textContent = "€ " + total.toFixed(2);
+    }
+    inputs.forEach(function (i) { i.addEventListener("change", update); });
+    update();
+})();
+</script>
+{% endblock %}

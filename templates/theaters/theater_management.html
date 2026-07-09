@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Gestione {{ theater.name }}{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between gap-4 mb-4">
+    <div>
+        <h1 class="section-title text-2xl">Gestione teatro</h1>
+        <p class="text-sm text-slate-600">{{ theater.name }} - {{ theater.city }}</p>
+    </div>
+    {% include "theaters/_management_nav.html" %}
+</div>
+
+<div class="space-y-6">
+    {% block management_content %}
+    <div class="card p-6 text-center">
+        <p class="text-base font-medium text-slate-900">Seleziona un pannello di modifica</p>
+        <p class="mt-2 text-sm text-slate-600">Usa i pulsanti in alto per aprire Dati teatro, Programmazione, Prenotazioni, Occupazione o Gestori.</p>
+    </div>
+    {% endblock %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}{% endblock %}

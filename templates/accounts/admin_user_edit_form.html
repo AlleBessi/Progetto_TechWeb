@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+{% block title %}Modifica utente — {{ target_user.username }}{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto card p-6 space-y-4">
+    <div>
+        <h1 class="section-title mb-1">Modifica utente</h1>
+        <p class="text-sm text-slate-600">{{ target_user.username }}</p>
+    </div>
+    <form method="post" class="text-sm">
+        {% csrf_token %}
+        {{ form.username|as_crispy_field }}
+        {{ form.email|as_crispy_field }}
+        {{ form.first_name|as_crispy_field }}
+        {{ form.last_name|as_crispy_field }}
+        {{ form.password|as_crispy_field }}
+        {# role — SimpleSelect2Widget: use partial #}
+        {% include "includes/select2_field.html" with field=form.role only %}
+        <div class="flex flex-wrap gap-2">
+            <a class="btn btn-ghost btn-sm" href="{% url 'accounts:admin_user_list' %}">Torna alla lista</a>
+            <button class="btn btn-primary btn-sm" type="submit">Salva modifiche</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+    {{ form.media }}
+{% endblock %}

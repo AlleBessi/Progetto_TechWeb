@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}Gestione sala{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div>
+        <h1 class="section-title">Gestione sala: {{ auditorium.name }}</h1>
+        <p class="text-sm text-slate-600">Teatro: {{ theater.name }}</p>
+        {% if has_bookings %}
+            <p class="mt-1 text-xs text-amber-700">Questa sala ha prenotazioni: le zone non possono essere modificate.</p>
+        {% endif %}
+    </div>
+    <form action="{% url 'theaters:management_detail' theater.id %}" method="get">
+        <button class="btn btn-ghost btn-sm" type="submit">Torna al teatro</button>
+    </form>
+</div>
+
+<form method="post" class="space-y-6">
+    {% csrf_token %}
+    <div class="card p-4">
+        <h2 class="section-title mb-3">Dati sala</h2>
+        {{ auditorium_form|crispy }}
+    </div>
+
+    <div class="card p-4 space-y-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="section-title">Zone e posti</h2>
+                <p class="text-xs text-slate-500">Ogni zona definisce righe e posti per riga. Il salvataggio rigenera automaticamente i posti.</p>
+            </div>
+                <button class="btn btn-primary btn-sm" type="button" id="add-zone-btn">+ Aggiungi zona</button>
+        </div>
+
+        {{ zone_formset.management_form }}
+        {{ zone_formset.non_form_errors }}
+
+        <div class="overflow-x-auto rounded border border-slate-200">
+            <table class="min-w-full divide-y divide-slate-200 text-sm" id="zone-table">
+                <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Zona</th>
+                        <th class="px-4 py-3 text-left">Righe</th>
+                        <th class="px-4 py-3 text-left">Posti per riga</th>
+                        <th class="px-4 py-3 text-left">Ordine</th>
+                        <th class="px-4 py-3 text-right">Azioni</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 bg-white">
+                    {% for form in zone_formset %}
+                    <tr id="zone-row-{{ forloop.counter0 }}" class="align-top">
+                        {{ form.id }}
+                        <td class="px-4 py-3">
+                            {{ form.zone }}
+                            {{ form.zone.errors }}
+                        </td>
+                        <td class="px-4 py-3">
+                            {{ form.rows }}
+                            {{ form.rows.errors }}
+                        </td>
+                        <td class="px-4 py-3">
+                            {{ form.seats_per_row }}
+                            {{ form.seats_per_row.errors }}
+                        </td>
+                        <td class="px-4 py-3">
+                            {{ form.order }}
+                            {{ form.order.errors }}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <span class="hidden">{{ form.DELETE }}</span>
+                            <button
+                                type="button"
+                                class="btn btn-danger btn-sm zone-delete-btn"
+                                data-delete-checkbox-id="{{ form.DELETE.id_for_label }}"
+                                data-row-id="zone-row-{{ forloop.counter0 }}"
+                            >Elimina</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <p class="text-xs text-slate-500">Le zone eliminate vengono rimosse dal salvataggio; i posti sono ricreati automaticamente solo se la sala non ha prenotazioni.</p>
+        <button class="btn btn-primary" type="submit">Salva</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ auditorium_form.media }}
+<script>
+    document.getElementById('zone-table').addEventListener('click', e => {
+        const btn = e.target.closest('.zone-delete-btn');
+        if (!btn) return;
+
+        const row = btn.closest('tr');
+
+        if (row.dataset.new) {
+            row.remove();
+        } else {
+            const checkbox = document.getElementById(btn.dataset.deleteCheckboxId);
+            if (checkbox) checkbox.checked = true;
+            row.classList.add('opacity-50');
+            btn.disabled = true;
+            btn.textContent = 'Eliminata';
+        }
+    });
+
+    document.getElementById('add-zone-btn')?.addEventListener('click', () => {
+        const totalInput = document.getElementById('id_zones-TOTAL_FORMS');
+        const idx        = parseInt(totalInput.value);
+        const prefix     = `zones-${idx}`;
+
+        const row = document.createElement('tr');
+        row.className   = 'align-top';
+        row.dataset.new = 'true';
+        row.innerHTML = `
+            <td class="px-4 py-3">
+                <input type="hidden" name="${prefix}-id" value="">
+                <input type="text"   name="${prefix}-zone"          id="id_${prefix}-zone"          placeholder="es. Platea">
+            </td>
+            <td class="px-4 py-3">
+                <input type="number" name="${prefix}-rows"          id="id_${prefix}-rows"          value="4"  min="1">
+            </td>
+            <td class="px-4 py-3">
+                <input type="number" name="${prefix}-seats_per_row" id="id_${prefix}-seats_per_row" value="10" min="1">
+            </td>
+            <td class="px-4 py-3">
+                <input type="number" name="${prefix}-order"         id="id_${prefix}-order"         value="0"  min="0">
+            </td>
+            <td class="px-4 py-3 text-right">
+                <button type="button" class="btn btn-danger btn-sm zone-delete-btn">Elimina</button>
+            </td>
+        `;
+
+        document.querySelector('#zone-table tbody').appendChild(row);
+        totalInput.value = idx + 1;
+        row.querySelector(`[name="${prefix}-zone"]`).focus();
+    });
+</script>
+{% endblock %}

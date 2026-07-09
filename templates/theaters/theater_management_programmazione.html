@@ -1,0 +1,91 @@
+{% extends "theaters/theater_management.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}Programmazione — {{ theater.name }}{% endblock %}
+
+{% block management_content %}
+<div class="space-y-4">
+    <div class="card p-5">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h2 class="section-title">Programmazione</h2>
+            </div>
+            <a class="btn btn-outline btn-sm" href="{% url 'shows:performance_create' theater.id %}">Aggiungi performance</a>
+        </div>
+        <form method="get" class="text-sm">
+            {# show — Select2: use partial #}
+            {% include "includes/select2_field.html" with field=filter.form.show only %}
+
+            {# auditorium — Select2: use partial #}
+            {% include "includes/select2_field.html" with field=filter.form.auditorium only %}
+
+            {# date_from — plain DateInput: crispy handles it natively #}
+            {{ filter.form.date_from|as_crispy_field }}
+
+            {# date_to — plain DateInput: crispy handles it natively #}
+            {{ filter.form.date_to|as_crispy_field }}
+
+            {# status — SimpleSelect2: use partial #}
+            {% include "includes/select2_field.html" with field=filter.form.status only %}
+
+            <div class="flex gap-2">
+                <button class="btn btn-primary btn-sm" type="submit">Filtra</button>
+                <a class="btn btn-outline btn-sm" href="{% url 'theaters:management_schedule' theater.id %}">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="card p-5">
+        <div class="overflow-x-auto rounded border border-slate-200">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Spettacolo</th>
+                        <th class="px-4 py-3 text-left">Data</th>
+                        <th class="px-4 py-3 text-left">Sala</th>
+                        <th class="px-4 py-3 text-left">Stato</th>
+                        <th class="px-4 py-3 text-right">Azioni</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 bg-white">
+                    {% for performance in performances %}
+                        <tr>
+                            <td class="px-4 py-3 font-medium text-slate-900">{{ performance.show.title }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ performance.starts_at|date:"d M Y H:i" }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ performance.auditorium.name }}</td>
+                            <td class="px-4 py-3 text-slate-600">
+                                {% if performance.status == 'scheduled' %}
+                                    Approvata
+                                {% elif performance.status == 'pending_artist_confirmation' %}
+                                    Non approvata
+                                {% elif performance.status == 'cancelled' %}
+                                    Eliminata
+                                {% else %}
+                                    {{ performance.get_status_display }}
+                                {% endif %}
+                            </td>
+                           <td class="px-4 py-3 text-right">
+                                <div class="flex flex-wrap justify-end gap-2">
+                                    {% if performance.status != 'cancelled' %}
+                                        <a class="btn btn-outline btn-sm" href="{% url 'shows:performance_edit' performance.id %}">Modifica</a>
+                                    {% endif %}
+                                    <form action="{% url 'shows:performance_delete' performance.id %}" method="post">
+                                        {% csrf_token %}
+                                        <button class="btn btn-danger btn-sm" type="submit">Elimina</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td class="px-4 py-4 text-slate-600" colspan="5">Nessuna performance programmata.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+    {{ filter.form.media }}
+{% endblock %}

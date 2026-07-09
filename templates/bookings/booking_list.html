@@ -10,15 +10,15 @@
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h2 class="font-semibold">{{ booking.performance.show.title }}</h2>
-                    <p class="text-sm text-slate-600">{{ booking.performance.theater.name }} - {{ booking.performance.starts_at }}</p>
+                    <p class="text-sm text-slate-600">{{ booking.performance.auditorium.theater.name }} - {{ booking.performance.starts_at }}</p>
                     <p class="text-sm">Totale: {{ booking.total_price }} EUR</p>
                 </div>
                 {% if booking.status != 'cancelled' %}
                     <div class="flex flex-wrap gap-2 text-sm">
-                        <form action="/bookings/{{ booking.id }}/edit/" method="get">
+                        <form action="{% url 'bookings:booking_update' booking.id %}" method="get">
                             <button class="btn btn-outline btn-sm" type="submit">Modifica</button>
                         </form>
-                        <form action="/bookings/{{ booking.id }}/cancel/" method="post">
+                        <form action="{% url 'bookings:booking_cancel' booking.id %}" method="post">
                             {% csrf_token %}
                             <button class="btn btn-danger btn-sm" type="submit">Annulla</button>
                         </form>

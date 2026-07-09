@@ -1,0 +1,60 @@
+{% with namespace=request.resolver_match.namespace url_name=request.resolver_match.url_name %}
+<aside class="app-sidebar">
+    <div class="sidebar-brand">
+        <a href="{% url 'core:home' %}" class="brand-link">Teatro Booking</a>
+        <p class="sidebar-subtitle">Piattaforma teatrale</p>
+    </div>
+
+    <nav class="sidebar-nav">
+        <div class="sidebar-group">
+            <p class="sidebar-group-title">Esplora</p>
+            <a href="{% url 'core:search' %}" class="sidebar-link {% if namespace == 'core' and url_name == 'search' %}sidebar-link-active{% endif %}">Cerca</a>
+            <a href="{% url 'theaters:list' %}" class="sidebar-link {% if namespace == 'theaters' and url_name == 'list' %}sidebar-link-active{% endif %}">Teatri</a>
+            <a href="{% url 'shows:list' %}" class="sidebar-link {% if namespace == 'shows' and url_name == 'list' %}sidebar-link-active{% endif %}">Spettacoli</a>
+        </div>
+
+        {% if user.is_authenticated %}
+            <div class="sidebar-group">
+                <p class="sidebar-group-title">Area riservata</p>
+                {% if can_book %}
+                    <a href="{% url 'bookings:booking_list' %}" class="sidebar-link {% if namespace == 'bookings' %}sidebar-link-active{% endif %}">Prenotazioni</a>
+                {% endif %}
+                <a href="{% url 'accounts:profile' %}" class="sidebar-link {% if namespace == 'accounts' and url_name == 'profile' %}sidebar-link-active{% endif %}">Profilo</a>
+                <form action="{% url 'accounts:logout' %}" method="post">
+                    {% csrf_token %}
+                    <button class="sidebar-link sidebar-button" type="submit">Esci</button>
+                </form>
+            </div>
+
+            {% if is_artist %}
+                <details class="sidebar-group sidebar-details" open>
+                    <summary class="sidebar-summary">Area artista</summary>
+                    <a href="{% url 'shows:artist_shows_dashboard' %}" class="sidebar-sublink {% if namespace == 'shows' and url_name == 'artist_shows_dashboard' %}sidebar-link-active{% endif %}">Dashboard spettacoli</a>
+                    <a href="{% url 'shows:artist_performances_dashboard' %}" class="sidebar-sublink {% if namespace == 'shows' and url_name == 'artist_performances_dashboard' %}sidebar-link-active{% endif %}">Approva performance</a>
+                </details>
+            {% endif %}
+
+            {% if is_theater_admin %}
+                <details class="sidebar-group sidebar-details" open>
+                    <summary class="sidebar-summary">Gestione teatri</summary>
+                    <a href="{% url 'theaters:management' %}" class="sidebar-sublink {% if namespace == 'theaters' and url_name == 'management' %}sidebar-link-active{% endif %}">Dashboard</a>
+                    <a href="{% url 'theaters:list' %}" class="sidebar-sublink {% if namespace == 'theaters' and url_name == 'list' %}sidebar-link-active{% endif %}">Lista teatri</a>
+                </details>
+            {% endif %}
+
+            {% if is_admin %}
+                <details class="sidebar-group sidebar-details" open>
+                    <summary class="sidebar-summary">Gestione utenti</summary>
+                    <a href="{% url 'accounts:admin_user_list' %}" class="sidebar-sublink {% if namespace == 'accounts' and url_name == 'admin_user_list' %}sidebar-link-active{% endif %}">Utenti e ruoli</a>
+                </details>
+            {% endif %}
+        {% else %}
+            <div class="sidebar-group">
+                <p class="sidebar-group-title">Accesso</p>
+                <a href="{% url 'accounts:login' %}" class="sidebar-link {% if namespace == 'accounts' and url_name == 'login' %}sidebar-link-active{% endif %}">Login</a>
+                <a href="{% url 'accounts:register' %}" class="sidebar-link sidebar-link-emphasis {% if namespace == 'accounts' and url_name == 'register' %}sidebar-link-active{% endif %}">Registrati</a>
+            </div>
+        {% endif %}
+    </nav>
+</aside>
+{% endwith %}

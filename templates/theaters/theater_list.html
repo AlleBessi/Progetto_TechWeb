@@ -3,20 +3,12 @@
 {% block title %}Teatri{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-between mb-4">
-    <h1 class="section-title">Teatri</h1>
-    {% if user.is_superuser %}
-        <form action="/theaters/new/" method="get">
-            <button class="btn btn-primary btn-sm" type="submit">Nuovo teatro</button>
-        </form>
-    {% endif %}
-</div>
 <div class="grid md:grid-cols-2 gap-4">
     {% for theater in theaters %}
         <div class="card p-4">
             <h2 class="font-semibold">{{ theater.name }}</h2>
             <p class="text-sm text-slate-600">{{ theater.city }}</p>
-            <form action="/theaters/{{ theater.id }}/" method="get" class="mt-3">
+            <form action="{% url 'theaters:detail' theater.id %}" method="get" class="mt-3">
                 <button class="btn btn-ghost btn-sm" type="submit">Dettagli</button>
             </form>
         </div>

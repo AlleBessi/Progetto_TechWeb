@@ -1,153 +1,83 @@
-from datetime import datetime
-
 from django import forms
-from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
-from django.utils import timezone
-from django_select2.forms import ModelSelect2Widget
 
-from apps.accounts.models import Role
-from apps.theaters.models import Hall
+from apps.core.select2_widgets import SimpleSelect2Widget, ShowSelect2Widget
+from apps.theaters.models import Auditorium, AuditoriumZone
 
-from .models import Performance, Show
-from .select2_widgets import ArtistSelect2Widget, ShowSelect2Widget
-
-User = get_user_model()
+from .models import Category, Performance, PerformancePrice, Show
 
 
 class ShowForm(forms.ModelForm):
-    artists = forms.ModelMultipleChoiceField(
-        queryset=User.objects.filter(profile__role__name=Role.ROLE_ARTIST),
-        widget=ArtistSelect2Widget(
-            attrs={"data-placeholder": "Seleziona almeno un artista..."}
-        ),
-        help_text="Seleziona almeno un artista",
+    category = forms.ModelChoiceField(
+        queryset=Category.objects.all(),
+        widget=SimpleSelect2Widget(),
     )
 
     class Meta:
         model = Show
-        fields = ["title", "description", "category", "duration_minutes", "poster", "cover", "artists"]
-
-    def clean_artists(self):
-        artists = self.cleaned_data.get("artists")
-        if not artists or artists.count() == 0:
-            raise ValidationError("Uno spettacolo deve avere almeno un artista.")
-        return artists
+        fields = ["title", "description", "category", "duration_minutes", "poster", "cover"]
 
 
 class PerformanceForm(forms.ModelForm):
     show = forms.ModelChoiceField(
-        queryset=Show.objects.filter(status__in=[Show.STATUS_ARTIST_CONFIRMED, Show.STATUS_APPROVED]),
-        widget=ShowSelect2Widget(attrs={"data-placeholder": "Seleziona uno spettacolo..."})
+        queryset=Show.objects.all(),
+        widget=ShowSelect2Widget(attrs={"data-placeholder": "Seleziona uno spettacolo..."}),
+    )
+    auditorium = forms.ModelChoiceField(
+        queryset=Auditorium.objects.none(),
+        widget=SimpleSelect2Widget(attrs={"data-placeholder": "Seleziona una sala..."}),
+    )
+    starts_at = forms.DateTimeField(
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+        input_formats=["%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S"],
     )
 
     class Meta:
         model = Performance
-        fields = ["show", "theater", "hall", "starts_at", "base_price"]
-        widgets = {
-            "starts_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
-        }
+        fields = ["show", "auditorium", "starts_at"]
 
-
-class PerformanceCreateForm(forms.Form):
-    show = forms.ModelChoiceField(
-        queryset=Show.objects.none(),
-        widget=ShowSelect2Widget(attrs={"data-placeholder": "Seleziona uno spettacolo..."})
-    )
-    hall = forms.ModelChoiceField(queryset=Hall.objects.none())
-    starts_at_list = forms.CharField(
-        widget=forms.Textarea(attrs={"rows": 4}),
-        help_text="Una data/ora per riga. Formato: YYYY-MM-DD HH:MM",
-    )
-
-    def __init__(self, theater, hall=None, zones=None, *args, **kwargs):
+    def __init__(self, *args, theater=None, selected_auditorium=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.theater = theater
-        self.hall = hall
-        self.zone_codes = []
+        self.no_zones: bool = False
+        # zone_by_field: field_name → zone_obj — used for saving prices
+        self.zone_by_field: dict[str, AuditoriumZone] = {}
+        self.fieldsets: list[tuple[str, list[str]]] = [
+            ("Dettagli performance", ["show", "auditorium", "starts_at"]),
+            ("Prezzi per zona", []),
+        ]
 
-        self.fields["show"].queryset = Show.objects.filter(
-            status__in=[Show.STATUS_ARTIST_CONFIRMED, Show.STATUS_APPROVED]
-        )
-        self.fields["hall"].queryset = theater.halls.all()
-        if hall is not None:
-            self.fields["hall"].initial = hall
-            self.fields["hall"].disabled = True
-            self.fields["hall"].required = False
+        if theater is not None:
+            self.fields["auditorium"].queryset = theater.auditoriums.all()
 
-        zones = zones or []
-        if zones:
-            for zone in zones:
-                code = zone.zone
-                label = zone.get_zone_display()
-                field_name = f"price_{code}"
-                self.fields[field_name] = forms.DecimalField(
-                    min_value=0,
-                    label=f"Prezzo {label} (EUR)",
-                    required=True,
-                )
-                self.zone_codes.append(code)
-        else:
-            self.fields["base_price"] = forms.DecimalField(
+        # Resolve the auditorium to use for zone generation:
+        # priority → explicit argument, then existing instance's auditorium
+        if selected_auditorium is None and self.instance.pk:
+            selected_auditorium = self.instance.auditorium
+
+        if selected_auditorium is not None:
+            self.fields["auditorium"].initial = selected_auditorium.pk
+            self._add_zone_fields(selected_auditorium)
+
+    def _add_zone_fields(self, auditorium: Auditorium) -> None:
+        zones = list(getattr(auditorium, "zones").order_by("order", "id"))
+        if not zones:
+            self.no_zones = True
+            return
+
+        price_lookup: dict[int, PerformancePrice] = {}
+        if self.instance.pk:
+            price_lookup = {
+                pp.auditorium_zone_id: pp
+                for pp in self.instance.zone_prices.filter(auditorium_zone__in=zones)
+            }
+
+        for zone in zones:
+            field_name = str(zone.cod_zone)
+            price_obj = price_lookup.get(zone.pk)
+            self.fields[field_name] = forms.DecimalField(
                 min_value=0,
-                label="Prezzo unico (EUR)",
+                label=f"Prezzo {zone.zone} (EUR)",
                 required=True,
+                initial=price_obj.price if price_obj else 0,
             )
-
-    def clean_starts_at_list(self):
-        raw = self.cleaned_data["starts_at_list"]
-        lines = [line.strip() for line in raw.splitlines() if line.strip()]
-        if not lines:
-            raise ValidationError("Inserisci almeno una data/ora.")
-        parsed = []
-        for line in lines:
-            normalized = line.replace("T", " ")
-            dt = None
-            for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
-                try:
-                    dt = datetime.strptime(normalized, fmt)
-                    break
-                except ValueError:
-                    continue
-            if dt is None:
-                raise ValidationError("Formato non valido: usa YYYY-MM-DD HH:MM")
-            if timezone.is_naive(dt):
-                dt = timezone.make_aware(dt, timezone.get_current_timezone())
-            parsed.append(dt)
-        return parsed
-
-
-class PerformanceUpdateForm(forms.Form):
-    starts_at = forms.DateTimeField(widget=forms.DateTimeInput(attrs={"type": "datetime-local"}))
-
-    def __init__(self, performance, zones=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.performance = performance
-        self.zone_codes = []
-        zones = zones or []
-        if zones:
-            for zone in zones:
-                code = zone.zone
-                label = zone.get_zone_display()
-                field_name = f"price_{code}"
-                price_obj = performance.zone_prices.filter(zone=code).first()
-                self.fields[field_name] = forms.DecimalField(
-                    min_value=0,
-                    label=f"Prezzo {label} (EUR)",
-                    required=True,
-                    initial=price_obj.price if price_obj else performance.base_price,
-                )
-                self.zone_codes.append(code)
-        else:
-            self.fields["base_price"] = forms.DecimalField(
-                min_value=0,
-                label="Prezzo unico (EUR)",
-                required=True,
-                initial=performance.base_price,
-            )
-
-    def clean_starts_at(self):
-        dt = self.cleaned_data["starts_at"]
-        if timezone.is_naive(dt):
-            dt = timezone.make_aware(dt, timezone.get_current_timezone())
-        return dt
+            self.zone_by_field[field_name] = zone
+            self.fieldsets[1][1].append(field_name)

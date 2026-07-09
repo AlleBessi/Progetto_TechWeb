@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "60b6d2aa5578859eefeed15952d9d8a0eecf8d96d17497726693e4449c55e35d"
+            "sha256": "212a4ff873bd5e29708c2085aa26210189ccadab6bf05ebba6ada5a5c5cc7cc5"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -24,6 +24,15 @@
             "markers": "python_version >= '3.9'",
             "version": "==3.11.1"
         },
+        "crispy-tailwind": {
+            "hashes": [
+                "sha256:2bc9f616d406e4b003f25d46fcb0079f1c2522719d97adb107667271d849459a",
+                "sha256:31427f66b1c4fd0d6fb040f4197cfb97d104cdbe7641ea2dea940c0057c4db4b"
+            ],
+            "index": "pypi",
+            "markers": "python_version >= '3.8'",
+            "version": "==1.0.3"
+        },
         "django": {
             "hashes": [
                 "sha256:9d58a7cb49244e74c8e161d5e403a46d6209f1009ba40f5a66d6aa0d0786a8f0",
@@ -40,6 +49,32 @@
             ],
             "markers": "python_version >= '3.9'",
             "version": "==1.2.0"
+        },
+        "django-braces": {
+            "hashes": [
+                "sha256:18c9fe889bc673bddee6110f23a8c57fefe99663c8c683a7c2ac4f8f8743674d",
+                "sha256:3a6fe630d3d91fef0711bfe1088d14af00c245559f79f6298040ed2b2f757337"
+            ],
+            "index": "pypi",
+            "version": "==1.17.0"
+        },
+        "django-crispy-forms": {
+            "hashes": [
+                "sha256:4921a1087c6cd4f9fa3c139654c1de1c1c385f8bd6729aaee530bc0121ab4b93",
+                "sha256:8ee0ae28b6b0ac41ff48a65944480c049fe8d1b0047086874fd7efabf4ec1374"
+            ],
+            "index": "pypi",
+            "markers": "python_version >= '3.10'",
+            "version": "==2.6"
+        },
+        "django-filter": {
+            "hashes": [
+                "sha256:760e984a931f4468d096f5541787efb8998c61217b73006163bf2f9523fe8f23",
+                "sha256:9c0f8609057309bba611062fe1b720b4a873652541192d232dd28970383633e3"
+            ],
+            "index": "pypi",
+            "markers": "python_version >= '3.10'",
+            "version": "==25.2"
         },
         "django-select2": {
             "hashes": [

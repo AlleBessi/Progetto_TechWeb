@@ -1,0 +1,75 @@
+{% extends "theaters/theater_management.html" %}
+
+{% block title %}Dati teatro — {{ theater.name }}{% endblock %}
+
+{% block management_content %}
+<div class="grid gap-6 lg:grid-cols-2">
+    <section class="card p-5 space-y-4">
+        <div class="flex items-center justify-between">
+            <h2 class="section-title">Dati teatro</h2>
+            <a class="btn btn-outline btn-sm" href="{% url 'theaters:update' theater.id %}">Modifica dati</a>
+        </div>
+        <div class="overflow-x-auto rounded border border-slate-200">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <tbody class="divide-y divide-slate-200 bg-white">
+                    <tr><th class="px-4 py-3 text-left text-slate-500">Descrizione</th><td class="px-4 py-3">{{ theater.description|default:"-" }}</td></tr>
+                    <tr><th class="px-4 py-3 text-left text-slate-500">Indirizzo</th><td class="px-4 py-3">{{ theater.address }}</td></tr>
+                    <tr><th class="px-4 py-3 text-left text-slate-500">Citta</th><td class="px-4 py-3">{{ theater.city }}</td></tr>
+                    <tr><th class="px-4 py-3 text-left text-slate-500">Provincia</th><td class="px-4 py-3">{{ theater.province|default:"-" }}</td></tr>
+                    <tr><th class="px-4 py-3 text-left text-slate-500">CAP</th><td class="px-4 py-3">{{ theater.postal_code|default:"-" }}</td></tr>
+                    <tr><th class="px-4 py-3 text-left text-slate-500">Telefono</th><td class="px-4 py-3">{{ theater.phone|default:"-" }}</td></tr>
+                    <tr><th class="px-4 py-3 text-left text-slate-500">Email</th><td class="px-4 py-3">{{ theater.email|default:"-" }}</td></tr>
+                    <tr><th class="px-4 py-3 text-left text-slate-500">Orari</th><td class="px-4 py-3">{{ theater.opening_hours|default:"-" }}</td></tr>
+                    <tr><th class="px-4 py-3 text-left text-slate-500">Sale</th><td class="px-4 py-3">{{ auditoriums|length }}</td></tr>
+                    <tr><th class="px-4 py-3 text-left text-slate-500">Capienza totale</th><td class="px-4 py-3">{{ theater.total_seats }}</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="card p-5 space-y-4">
+        <div class="flex items-center justify-between">
+            <h2 class="section-title">Sale e zone</h2>
+            <a class="btn btn-primary btn-sm" href="{% url 'theaters:auditorium_create' theater.id %}">Nuova sala</a>
+        </div>
+        <div class="overflow-x-auto rounded border border-slate-200">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Sala</th>
+                        <th class="px-4 py-3 text-left">Zone</th>
+                        <th class="px-4 py-3 text-right">Posti totali</th>
+                        <th class="px-4 py-3 text-right">Azioni</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 bg-white">
+                    {% for auditorium in auditoriums %}
+                        <tr class="align-top">
+                            <td class="px-4 py-3 font-medium text-slate-900">{{ auditorium.name }}</td>
+                            <td class="px-4 py-3 text-slate-600">
+                                {% for zone in auditorium.zones.all %}
+                                    <div class="whitespace-nowrap">{{ zone.zone }} — {{ zone.rows }} righe • {{ zone.seats_per_row }} posti</div>
+                                {% empty %}
+                                    <span class="text-xs text-slate-500">Nessuna zona configurata.</span>
+                                {% endfor %}
+                            </td>
+                            <td class="px-4 py-3 text-right text-slate-900">{{ auditorium.seats.count }}</td>
+                            <td class="px-4 py-3 text-right">
+                                <div class="flex flex-wrap justify-end gap-2">
+                                    <a class="btn btn-outline btn-sm" href="{% url 'theaters:auditorium_update' theater.id auditorium.id %}">Gestisci zone</a>
+                                    <form action="{% url 'theaters:auditorium_delete' theater.id auditorium.id %}" method="post">
+                                        {% csrf_token %}
+                                        <button class="btn btn-danger btn-sm" type="submit">Elimina</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td class="px-4 py-4 text-slate-600" colspan="4">Nessuna sala inserita.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

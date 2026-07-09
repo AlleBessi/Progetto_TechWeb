@@ -1,39 +1,71 @@
 {% extends "base.html" %}
+{% load crispy_forms_tags %}
 
 {% block title %}Ricerca{% endblock %}
 
 {% block content %}
-<div class="grid lg:grid-cols-4 gap-6">
-    <div class="card p-4">
-        <h2 class="section-title mb-3">Filtri</h2>
-        <form method="get" class="space-y-3 text-sm">
-            {{ form.as_p }}
-            <button class="btn btn-primary btn-sm" type="submit">Cerca</button>
-        </form>
-    </div>
-    <div class="lg:col-span-3">
-        <h2 class="section-title mb-3">Risultati</h2>
-        <div class="space-y-3">
-            {% for performance in performances %}
-                <div class="card p-4">
-                    <div class="flex flex-wrap justify-between items-center gap-3">
-                        <div>
-                            <h3 class="font-semibold">{{ performance.show.title }}</h3>
-                            <p class="text-sm text-slate-600">{{ performance.theater.name }} - {{ performance.starts_at }}</p>
-                        </div>
-                        {% if can_book %}
-                            <form action="/bookings/performance/{{ performance.id }}/" method="get">
-                                <button class="btn btn-primary btn-sm" type="submit">Prenota</button>
-                            </form>
-                        {% elif user.is_authenticated and not can_book %}
-                            <span class="badge">Solo utenti standard</span>
-                        {% else %}
-                            <form action="/accounts/login/" method="get">
-                                <button class="btn btn-outline btn-sm" type="submit">Accedi</button>
-                            </form>
-                        {% endif %}
+<div class="space-y-6">
+    <div class="card p-5 space-y-4">
+        <div>
+            <h2 class="section-title">Ricerca spettacoli</h2>
+            <p class="text-xs text-slate-500">Usa la ricerca base per partire velocemente e apri i filtri avanzati solo se ti servono più opzioni.</p>
+        </div>
+        <form method="get" class="space-y-5 text-sm">
+            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div class="md:col-span-2 xl:col-span-2">
+                    {{ filter.form.q|as_crispy_field }}
+                </div>
+                <div>
+                    {% include "includes/select2_field.html" with field=filter.form.category only %}
+                </div>
+                <div>
+                    {{ filter.form.date_from|as_crispy_field }}
+                </div>
+                <div>
+                    {{ filter.form.date_to|as_crispy_field }}
+                </div>
+            </div>
+
+            <details class="rounded-2xl border border-slate-200 bg-slate-50 p-4 open:bg-white">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-700">
+                    <span>Filtri avanzati</span>
+                    <span class="text-lg leading-none text-slate-500">▾</span>
+                </summary>
+                <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                        {% include "includes/select2_field.html" with field=filter.form.show only %}
+                    </div>
+                    <div>
+                        {% include "includes/select2_field.html" with field=filter.form.theater only %}
+                    </div>
+                    <div>
+                        {% include "includes/select2_field.html" with field=filter.form.artist only %}
+                    </div>
+                    <div>
+                        {{ filter.form.price_min|as_crispy_field }}
+                    </div>
+                    <div>
+                        {{ filter.form.price_max|as_crispy_field }}
                     </div>
                 </div>
+            </details>
+
+            <div class="flex flex-wrap gap-2">
+                <button class="btn btn-primary btn-sm" type="submit">Applica filtri</button>
+                <a class="btn btn-outline btn-sm" href="{% url 'core:search' %}">Reset</a>
+            </div>
+        </form>
+    </div>
+    <div class="space-y-4">
+        <div class="flex items-end justify-between">
+            <div>
+                <h2 class="section-title">Risultati</h2>
+                <p class="text-sm text-slate-500">{{ performances|length }} performance trovate.</p>
+            </div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-4">
+            {% for performance in performances %}
+                {% include "shows/_show_card.html" with performance=performance %}
             {% empty %}
                 <p class="text-sm text-slate-600">Nessun risultato.</p>
             {% endfor %}
@@ -43,5 +75,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-    {{ form.media }}
+    {{ filter.form.media }}
 {% endblock %}

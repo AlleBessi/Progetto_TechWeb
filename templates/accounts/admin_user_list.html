@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Gestione utenti{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div class="card p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h1 class="section-title mb-1">Gestione utenti</h1>
+                <p class="text-sm text-slate-600">Crea nuovi utenti e assegna il ruolo tramite gruppi.</p>
+            </div>
+            <a class="btn btn-primary btn-sm" href="{% url 'accounts:admin_user_create' %}">Nuovo utente</a>
+        </div>
+    </div>
+
+    <div class="card overflow-hidden">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                    <th class="px-4 py-3 text-left">Utente</th>
+                    <th class="px-4 py-3 text-left">Email</th>
+                    <th class="px-4 py-3 text-left">Ruolo</th>
+                    <th class="px-4 py-3 text-right">Azioni</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 bg-white">
+                {% for row in user_rows %}
+                <tr>
+                    <td class="px-4 py-3 font-medium text-slate-900">{{ row.user.get_full_name|default:row.user.username }}</td>
+                    <td class="px-4 py-3 text-slate-600">{{ row.user.email|default:"-" }}</td>
+                    <td class="px-4 py-3 text-slate-600">{{ row.role.name|default:"-" }}</td>
+                    <td class="px-4 py-3 text-right">
+                        <div class="flex flex-wrap justify-end gap-2">
+                            <a class="btn btn-outline btn-sm" href="{% url 'accounts:admin_user_edit' row.user.id %}">Modifica</a>
+                            {% if row.user != request.user %}
+                            <form action="{% url 'accounts:admin_user_delete' row.user.id %}" method="post">
+                                {% csrf_token %}
+                                <button class="btn btn-danger btn-sm" type="submit">Elimina</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td class="px-4 py-4 text-slate-600" colspan="4">Nessun utente disponibile.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

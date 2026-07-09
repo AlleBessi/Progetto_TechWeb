@@ -1,0 +1,34 @@
+{% comment %}
+  Partial: includes/select2_field.html
+
+  Renders a django-select2 field with the exact same DOM structure and Tailwind
+  classes that crispy-tailwind emits for every other field, so all form fields
+  sit flush in the same vertical rhythm.
+
+  Required context variable:
+    field  —  a bound form field, e.g. filter.form.show
+
+  Usage:
+
+{% endcomment %}
+<div id="div_{{ field.auto_id }}" class="mb-3">
+
+    <label for="{{ field.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+        {{ field.label|safe }}{% if field.field.required %}<span class="asteriskField">*</span>{% endif %}
+    </label>
+
+    {{ field }}
+
+    {% if field.help_text %}
+        <small id="hint_{{ field.auto_id }}" class="text-gray-600">{{ field.help_text|safe }}</small>
+    {% endif %}
+
+    {% if field.errors %}
+        {% for error in field.errors %}
+            <p id="error_{{ forloop.counter }}_{{ field.auto_id }}" class="mt-1 text-red-500 text-xs italic">
+                <strong>{{ error }}</strong>
+            </p>
+        {% endfor %}
+    {% endif %}
+
+</div>

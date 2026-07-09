@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Category, Performance, PerformanceZonePrice, Show
+from .models import Category, Performance, PerformancePrice, Show
 
 
 @admin.register(Category)
@@ -11,18 +11,18 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Show)
 class ShowAdmin(admin.ModelAdmin):
-	list_display = ("title", "category", "status", "created_by")
-	list_filter = ("status", "category")
-	search_fields = ("title", "created_by__username")
+	list_display = ("title", "category", "artist")
+	list_filter = ("category",)
+	search_fields = ("title", "artist__username")
 
 
 @admin.register(Performance)
 class PerformanceAdmin(admin.ModelAdmin):
-	list_display = ("show", "theater", "hall", "starts_at", "status")
-	list_filter = ("status", "theater")
+	list_display = ("show", "auditorium__theater", "auditorium", "starts_at", "status")
+	list_filter = ("status", "auditorium__theater")
 
 
-@admin.register(PerformanceZonePrice)
-class PerformanceZonePriceAdmin(admin.ModelAdmin):
-	list_display = ("performance", "zone", "price")
-	list_filter = ("zone",)
+@admin.register(PerformancePrice)
+class PerformancePriceAdmin(admin.ModelAdmin):
+	list_display = ("performance", "auditorium_zone", "price")
+	list_filter = ("auditorium_zone",)

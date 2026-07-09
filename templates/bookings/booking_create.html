@@ -1,11 +1,12 @@
 {% extends "base.html" %}
+{% load l10n %}
 
 {% block title %}Prenota{% endblock %}
 
 {% block content %}
 <div class="card p-6 mb-6 space-y-2">
     <h1 class="section-title">{{ performance.show.title }}</h1>
-    <p class="text-sm text-slate-600">{{ performance.theater.name }} - {{ performance.starts_at }}</p>
+    <p class="text-sm text-slate-600">{{ performance.auditorium.theater.name }} - {{ performance.starts_at }}</p>
     <p class="text-xs text-slate-500">Seleziona i posti: il colore cambia quando li attivi.</p>
 </div>
 
@@ -18,7 +19,7 @@
     <div class="card p-4">
         <div class="stage mb-4">Palco</div>
         <div class="flex flex-wrap gap-3 text-xs mb-4">
-            {% for zone in zone_layout %}
+            {% for zone in form.zone_layout %}
                 <div class="flex items-center gap-2">
                     <span class="seat {{ zone.color_class }}">
                         <span class="seat-label">{{ zone.label|slice:":1" }}</span>
@@ -33,7 +34,7 @@
         </div>
 
         <div class="space-y-4">
-            {% for zone in zone_layout %}
+            {% for zone in form.zone_layout %}
                 <div class="card p-4 space-y-3">
                     <div class="flex items-center justify-between">
                         <h3 class="section-title">{{ zone.label }}</h3>
@@ -48,7 +49,7 @@
                                         <span class="seat"><span class="seat-label seat-reserved">{{ item.seat.number }}</span></span>
                                     {% else %}
                                         <label class="seat {{ zone.color_class }} cursor-pointer">
-                                            <input class="seat-input" type="checkbox" name="seats" value="{{ item.seat.id }}">
+                                            <input class="seat-input" type="checkbox" name="seats" value="{{ item.seat.id }}" data-price="{{ item.price|unlocalize }}">
                                             <span class="seat-label">{{ item.seat.number }}</span>
                                         </label>
                                     {% endif %}
@@ -61,6 +62,27 @@
         </div>
     </div>
 
+    <div class="card p-4 flex items-center justify-between">
+        <span class="text-sm font-medium text-slate-600">Totale</span>
+        <span id="booking-total" class="text-lg font-semibold text-slate-900">€ 0.00</span>
+    </div>
+
     <button class="btn btn-primary" type="submit">Conferma prenotazione</button>
 </form>
+
+<script>
+(function () {
+    const totalEl = document.getElementById("booking-total");
+    const inputs = document.querySelectorAll(".seat-input");
+    function update() {
+        let total = 0;
+        inputs.forEach(function (i) {
+            if (i.checked) total += parseFloat(i.dataset.price || "0");
+        });
+        totalEl.textContent = "€ " + total.toFixed(2);
+    }
+    inputs.forEach(function (i) { i.addEventListener("change", update); });
+    update();
+})();
+</script>
 {% endblock %}

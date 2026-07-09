@@ -1,0 +1,9 @@
+{% with url_name=request.resolver_match.url_name %}
+<nav class="management-nav" aria-label="Menu gestione teatro">
+    <a class="management-nav-link {% if url_name == 'management_data' %}management-nav-link-active{% endif %}" href="{% url 'theaters:management_data' theater.id %}">Dati teatro</a>
+    <a class="management-nav-link {% if url_name == 'management_schedule' %}management-nav-link-active{% endif %}" href="{% url 'theaters:management_schedule' theater.id %}">Programmazione</a>
+    <a class="management-nav-link {% if url_name == 'management_bookings' %}management-nav-link-active{% endif %}" href="{% url 'theaters:management_bookings' theater.id %}">Prenotazioni</a>
+    <a class="management-nav-link {% if url_name == 'management_occupancy' %}management-nav-link-active{% endif %}" href="{% url 'theaters:management_occupancy' theater.id %}">Occupazione</a>
+    <a class="management-nav-link {% if url_name == 'management_admins' %}management-nav-link-active{% endif %}" href="{% url 'theaters:management_admins' theater.id %}">Gestori</a>
+</nav>
+{% endwith %}

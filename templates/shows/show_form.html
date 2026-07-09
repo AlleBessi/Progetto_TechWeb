@@ -1,14 +1,27 @@
 {% extends "base.html" %}
+{% load crispy_forms_tags %}
 
-{% block title %}Nuovo spettacolo{% endblock %}
+{% block title %}{% if show %}Modifica spettacolo{% else %}Nuovo spettacolo{% endif %}{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto card p-6">
-    <h1 class="section-title mb-4">{% if show %}Modifica spettacolo{% else %}Nuovo spettacolo{% endif %}</h1>
+<div class="max-w-3xl mx-auto card p-6 space-y-4">
+    <div>
+        <h1 class="section-title mb-1">{% if show %}Modifica spettacolo{% else %}Nuovo spettacolo{% endif %}</h1>
+        <p class="text-sm text-slate-600">Compila i dati dello spettacolo. L'artista associato e' il creatore dello spettacolo.</p>
+    </div>
     <form method="post" enctype="multipart/form-data" class="space-y-4">
         {% csrf_token %}
-        {{ form.as_p }}
-        <button class="btn btn-primary" type="submit">Salva</button>
+        {{ form.title|as_crispy_field }}
+        {{ form.description|as_crispy_field }}
+        {# category — SimpleSelect2Widget: use partial #}
+        {% include "includes/select2_field.html" with field=form.category only %}
+        {{ form.duration_minutes|as_crispy_field }}
+        {{ form.poster|as_crispy_field }}
+        {{ form.cover|as_crispy_field }}
+        <div class="flex flex-wrap gap-2">
+            <a class="btn btn-ghost btn-sm" href="{% url 'shows:artist_shows_dashboard' %}">Torna alla dashboard</a>
+            <button class="btn btn-primary btn-sm" type="submit">Salva</button>
+        </div>
     </form>
 </div>
 {% endblock %}

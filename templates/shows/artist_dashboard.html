@@ -3,36 +3,59 @@
 {% block title %}Area artista{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-between mb-4">
-    <h1 class="section-title">Area artista</h1>
-    <form action="/shows/artist/new/" method="get">
-        <button class="btn btn-primary btn-sm" type="submit">Nuovo spettacolo</button>
-    </form>
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div>
+        <h1 class="section-title">Area artista</h1>
+        <p class="text-sm text-slate-600">Gestione tabellare degli spettacoli creati.</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <form action="{% url 'shows:artist_performances_dashboard' %}" method="get">
+            <button class="btn btn-outline btn-sm" type="submit">Performance in attesa</button>
+        </form>
+        <form action="{% url 'shows:create' %}" method="get">
+            <button class="btn btn-primary btn-sm" type="submit">Nuovo spettacolo</button>
+        </form>
+    </div>
 </div>
-<div class="space-y-3">
-    {% for show in shows %}
-        <div class="card p-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h2 class="font-semibold">{{ show.title }}</h2>
-                <p class="text-sm text-slate-600">{{ show.category.name }} - {{ show.get_status_display }}</p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                <form action="/shows/artist/{{ show.id }}/edit/" method="get">
-                    <button class="btn btn-ghost btn-sm" type="submit">Modifica</button>
-                </form>
-                {% if show.status == 'draft' %}
-                    <form action="/shows/artist/{{ show.id }}/confirm/" method="get">
-                        <button class="btn btn-outline btn-sm" type="submit">Conferma</button>
-                    </form>
-                {% endif %}
-                <form action="/shows/artist/{{ show.id }}/delete/" method="post">
-                    {% csrf_token %}
-                    <button class="btn btn-danger btn-sm" type="submit">Elimina</button>
-                </form>
-            </div>
-        </div>
-    {% empty %}
-        <p class="text-sm text-slate-600">Nessuno spettacolo creato.</p>
-    {% endfor %}
+
+<div class="card overflow-x-auto">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+                <th class="px-4 py-3 text-left">Titolo</th>
+                <th class="px-4 py-3 text-left">Categoria</th>
+                <th class="px-4 py-3 text-right">Azioni</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200 bg-white">
+            {% for show in shows %}
+                <tr>
+                    <td class="px-4 py-3 font-medium text-slate-900">{{ show.title }}</td>
+                    <td class="px-4 py-3 text-slate-600">{{ show.category.name }}</td>
+                    <td class="px-4 py-3">
+                        <div class="flex flex-wrap justify-end gap-2">
+                            <form action="{% url 'shows:edit' show.id %}" method="get">
+                                <button class="btn btn-ghost btn-sm" type="submit">Modifica</button>
+                            </form>
+                            <form action="{% url 'shows:delete' show.id %}" method="post">
+                                {% csrf_token %}
+                                <button class="btn btn-danger btn-sm" type="submit">Elimina</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td class="px-4 py-6 text-slate-600" colspan="3">Nessuno spettacolo creato.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
+
+{% if can_access_dashboard %}
+<div class="mt-4 text-xs text-slate-500">
+    Accesso dashboard esteso attivo.
+</div>
+{% endif %}
 {% endblock %}
