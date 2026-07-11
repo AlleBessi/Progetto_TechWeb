@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -125,35 +125,19 @@ class BookingSeat(models.Model):
         if self.booking and self.performance:
             if self.booking.performance.pk != self.performance.pk:
                 raise ValidationError("Booking and performance must match.")
+        if self.performance_id and self.seat_id:
+            conflict = (
+                BookingSeat.objects.filter(
+                    performance_id=self.performance_id,
+                    seat_id=self.seat_id,
+                    booking__status=Booking.STATUS_CONFIRMED,
+                )
+                .exclude(pk=self.pk)
+                .exists()
+            )
+            if conflict:
+                raise ValidationError("Questo posto e' gia' stato prenotato.")
 
     def save(self, *args, **kwargs):
-        # NOTE: bulk_create() bypasses save() and therefore clean().
-        # Use BookingSeat.bulk_create_for_booking() for batch inserts so
-        # the invariant is validated before writing.
         self.clean()
         super().save(*args, **kwargs)
-
-    @classmethod
-    def bulk_create_for_booking(
-        cls,
-        booking: "Booking",
-        performance: "Performance",
-        seat_prices: list[tuple],
-    ) -> Sequence["BookingSeat"]:
-        """Create multiple BookingSeat rows in a single query.
-
-        Validates the booking↔performance invariant before inserting, which
-        plain bulk_create() would skip.  seat_prices is a list of
-        (Seat, Decimal) tuples.
-        """
-        if booking.performance.pk != performance.pk:
-            raise ValidationError("Il booking e la performance non corrispondono.")
-        return cls.objects.bulk_create([
-            cls(
-                booking=booking,
-                performance=performance,
-                seat=seat,
-                price_at_purchase=price,
-            )
-            for seat, price in seat_prices
-        ])

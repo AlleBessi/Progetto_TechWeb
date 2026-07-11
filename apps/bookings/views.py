@@ -119,6 +119,10 @@ class BookingUpdate(ClientOnlyMixin, FormView):
 	performance: Performance
 
 	def dispatch(self, request, *args, **kwargs) -> HttpResponse:
+		if not request.user.is_authenticated:
+			# Avoid querying with an AnonymousUser as the `user` FK filter below;
+			# let ClientOnlyMixin's permission check (super().dispatch()) deny access.
+			return super().dispatch(request, *args, **kwargs)  # type: ignore[return-value]
 		self.booking = get_object_or_404(Booking, pk=kwargs.get("booking_id"), user=request.user)
 		self.performance = self.booking.performance
 		if self.booking.status == Booking.STATUS_CANCELLED:

@@ -1,6 +1,7 @@
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from braces.views import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib import messages
 from django.http import HttpRequest
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 
 from apps.theaters.models import Theater, TheaterAdmin
 
@@ -32,9 +33,7 @@ class ManagerAccessMixin(LoginRequiredMixin, UserPassesTestMixin):
 
         return get_object_or_404(Theater, pk=theater_id)
 
-    def test_func(self) -> bool:
-        user = self.request.user
-
+    def test_func(self, user) -> bool:
         if user.is_superuser:
             return True
 
@@ -45,13 +44,15 @@ class ManagerAccessMixin(LoginRequiredMixin, UserPassesTestMixin):
 
 
 class ClientOnlyMixin(LoginRequiredMixin, UserPassesTestMixin):
-    """Allow only users in the 'client' or 'admin' groups (or superusers)."""
+    """Allow only users in the 'client' group."""
 
-    raise_exception = True
     request: HttpRequest
 
-    def test_func(self) -> bool:
-        user = self.request.user
-        if user.is_superuser:
-            return True
-        return user.groups.filter(name="client").exists() or user.groups.filter(name="admin").exists()
+    @staticmethod
+    def raise_exception(request: HttpRequest):
+        """Generic access-denied message instead of a bare 403."""
+        messages.info(request, "Non hai accesso a questa funzionalità.")
+        return redirect("core:home")
+
+    def test_func(self, user) -> bool:
+        return user.groups.filter(name="client").exists()

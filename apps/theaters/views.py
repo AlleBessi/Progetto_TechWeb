@@ -601,7 +601,13 @@ class BookingUpdateManagerView(TheaterScopedMixin, ManagerAccessMixin, SingleObj
                 for seat in selected_seats
             ]
             BookingSeat.objects.filter(booking=booking).delete()
-            BookingSeat.bulk_create_for_booking(booking, performance, seat_prices)
+            for seat, price in seat_prices:
+                BookingSeat.objects.create(
+                    booking=booking,
+                    performance=performance,
+                    seat=seat,
+                    price_at_purchase=price,
+                )
             booking.total_price = sum((price for _, price in seat_prices), Decimal("0.00"))
             booking.save(update_fields=["total_price"])
 

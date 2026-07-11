@@ -8,58 +8,29 @@
         Sei registrato come artista o gestore: la prenotazione dei posti non e disponibile.
     </div>
 {% endif %}
-<div class="grid lg:grid-cols-3 gap-6">
-    <div class="lg:col-span-2 space-y-6">
-        {% if recommendations %}
-        <section>
-            <h2 class="section-title mb-3">Consigliati per te</h2>
-            <div class="grid md:grid-cols-2 gap-4">
-                {% for performance in recommendations %}
-                    {% include "shows/_show_card.html" with performance=performance %}
-                {% endfor %}
-            </div>
-        </section>
-        {% endif %}
+<div class="space-y-6">
+    {% if recommendations %}
+    <section>
+        <h2 class="section-title mb-3">Consigliati per te</h2>
+        <div class="grid md:grid-cols-2 gap-4">
+            {% for performance in recommendations %}
+                {% include "shows/_show_card.html" with performance=performance %}
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
 
-        <section>
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="section-title">Prossime performance</h2>
-            </div>
-            <div class="grid md:grid-cols-2 gap-4">
-                {% for performance in performances %}
-                    {% include "shows/_show_card.html" with performance=performance %}
-                {% empty %}
-                    <p class="text-sm text-slate-600">Nessuna performance disponibile.</p>
-                {% endfor %}
-            </div>
-        </section>
-    </div>
-
-    <aside class="space-y-6">
-        <section class="card p-4 space-y-3">
-            <h2 class="section-title">Ricerca rapida</h2>
-            <form action="{% url 'core:search' %}" method="get">
-                <button class="btn btn-outline btn-sm" type="submit">Vai alla ricerca</button>
-            </form>
-        </section>
-
-        <section class="card p-4">
-            <h2 class="section-title mb-2">Teatri in evidenza</h2>
-            {% if featured_theaters %}
-                <ul class="space-y-2 text-sm">
-                    {% for theater in featured_theaters %}
-                        <li>
-                            <form action="{% url 'theaters:detail' theater.id %}" method="get">
-                                <button class="btn btn-ghost btn-sm" type="submit">{{ theater.name }}</button>
-                            </form>
-                            <div class="text-slate-600">{{ theater.city }}</div>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p class="text-sm text-slate-600">Nessun teatro disponibile.</p>
-            {% endif %}
-        </section>
-    </aside>
+    <section>
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="section-title">Prossime performance</h2>
+        </div>
+        <div class="grid md:grid-cols-2 gap-4">
+            {% for performance in performances %}
+                {% include "shows/_show_card.html" with performance=performance %}
+            {% empty %}
+                <p class="text-sm text-slate-600">Nessuna performance disponibile.</p>
+            {% endfor %}
+        </div>
+    </section>
 </div>
 {% endblock %}

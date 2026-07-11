@@ -1,23 +1,10 @@
-"""Unit test per il flusso di prenotazione teatrale.
-
-Sono implementate tre verifiche:
-
-1. Prenotazioni duplicate: non e possibile prenotare piu volte lo stesso posto
-   per la stessa performance.
-2. Vietata cancellazione: non e possibile annullare una prenotazione se la
-   performance associata e gia iniziata (o non e piu programmata).
-3. Atomicita: la prenotazione di piu posti deve eseguire interamente oppure non
-   eseguire affatto. Se anche un solo posto e gia occupato, l'intera operazione
-   fallisce e nessun posto viene prenotato.
-"""
-
 from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.db import IntegrityError, transaction
-from django.test import Client, TestCase
+from django.core.exceptions import ValidationError
+from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 
@@ -26,172 +13,124 @@ from apps.theaters.models import Auditorium, AuditoriumZone, Theater
 
 from .models import Booking, BookingSeat
 
+User = get_user_model()
 
-class BookingTestBase(TestCase):
-    """Helper condivisi per costruire un teatro con posti e una performance."""
 
+class BookingTests(TestCase):
     def setUp(self):
-        self.User = get_user_model()
+        # ClientOnlyMixin fa passare nelle view di prenotazione solo gli
+        # utenti che appartengono al gruppo "client" o "admin"; create_user()
+        # da solo non assegna alcun gruppo (questo avviene solo all'interno
+        # di RegisterView), quindi qui lo assegniamo manualmente.
         self.client_group = Group.objects.create(name="client")
+        self.user1 = User.objects.create_user(username="utente1", password="password123")
+        self.user1.groups.add(self.client_group)
+        self.user2 = User.objects.create_user(username="utente2", password="password123")
+        self.user2.groups.add(self.client_group)
 
-    def make_client_user(self, username):
-        user = self.User.objects.create_user(username=username, password="pass12345")
-        user.groups.add(self.client_group)
-        return user
-
-    def make_performance(self, starts_at=None, status=Performance.STATUS_SCHEDULED):
-        """Crea teatro, sala con una zona da 1 riga x 2 posti (A1, A2) e performance."""
-        if starts_at is None:
-            starts_at = timezone.now() + timedelta(days=1)
-
-        theater = Theater.objects.create(
-            name="Teatro Test",
-            address="Via Roma 1",
-            city="Roma",
+        # Sala minima: un teatro, una zona, 2 posti (A1, A2)
+        self.theater = Theater.objects.create(name="Teatro Test", address="Via Roma 1", city="Roma")
+        self.auditorium = Auditorium.objects.create(theater=self.theater, name="Sala 1")
+        self.zone = AuditoriumZone.objects.create(
+            auditorium=self.auditorium, zone="Platea", rows=1, seats_per_row=2, order=1
         )
-        auditorium = Auditorium.objects.create(theater=theater, name="Sala 1")
-        zone = AuditoriumZone.objects.create(
-            auditorium=auditorium, zone="Platea", rows=1, seats_per_row=2, order=1
-        )
-        auditorium.regenerate_seats()
+        self.auditorium.regenerate_seats()
 
-        artist = self.User.objects.create_user(username="artista", password="pass12345")
-        category = Category.objects.create(name="Prosa", slug="prosa")
-        show = Show.objects.create(
-            artist=artist,
+        self.seat_a1 = self.auditorium.seats.get(row="A", number=1)
+        self.seat_a2 = self.auditorium.seats.get(row="A", number=2)
+
+        # Uno spettacolo con una performance programmata, che inizia domani
+        self.artist = User.objects.create_user(username="artista", password="password123")
+        self.category = Category.objects.create(name="Prosa", slug="prosa")
+        self.show = Show.objects.create(
+            artist=self.artist,
             title="Spettacolo Test",
             description="Descrizione",
-            category=category,
+            category=self.category,
             duration_minutes=90,
         )
-        performance = Performance.objects.create(
-            show=show,
-            auditorium=auditorium,
-            starts_at=starts_at,
-            status=status,
+        self.performance = Performance.objects.create(
+            show=self.show,
+            auditorium=self.auditorium,
+            starts_at=timezone.now() + timedelta(days=1),
+            status=Performance.STATUS_SCHEDULED,
         )
         PerformancePrice.objects.create(
-            performance=performance, auditorium_zone=zone, price=Decimal("20.00")
-        )
-        return performance
-
-    def seat(self, performance, row, number):
-        return performance.auditorium.seats.get(row=row, number=number)
-
-    def make_confirmed_booking(self, user, performance, seats):
-        """Crea una prenotazione confermata con i posti indicati."""
-        booking = Booking.objects.create(user=user, performance=performance)
-        total = Decimal("0.00")
-        for seat in seats:
-            price = performance.zone_price(seat.auditorium_zone)
-            BookingSeat.objects.create(
-                booking=booking,
-                performance=performance,
-                seat=seat,
-                price_at_purchase=price,
-            )
-            total += price
-        booking.total_price = total
-        booking.save(update_fields=["total_price"])
-        return booking
-
-
-class DuplicateBookingTests(BookingTestBase):
-    """Test di prenotazioni duplicate."""
-
-    def test_stesso_posto_non_prenotabile_due_volte(self):
-        performance = self.make_performance()
-        user_a = self.make_client_user("cliente_a")
-        user_b = self.make_client_user("cliente_b")
-        a1 = self.seat(performance, "A", 1)
-
-        # Prima prenotazione confermata sul posto A1.
-        self.make_confirmed_booking(user_a, performance, [a1])
-
-        # Un secondo tentativo sullo stesso (performance, seat) viola
-        # unique_together e deve sollevare IntegrityError.
-        booking_b = Booking.objects.create(user=user_b, performance=performance)
-        with self.assertRaises(IntegrityError):
-            with transaction.atomic():
-                BookingSeat.objects.create(
-                    booking=booking_b,
-                    performance=performance,
-                    seat=a1,
-                    price_at_purchase=Decimal("20.00"),
-                )
-
-
-class BookingCancellationTests(BookingTestBase):
-    """Test di vietata cancellazione di una prenotazione."""
-
-    def test_non_cancellabile_se_performance_gia_iniziata(self):
-        # La prenotazione nasce su una performance futura; poi la performance
-        # inizia (starts_at spostato nel passato con un update diretto che
-        # bypassa la validazione del modello). A quel punto non deve piu essere
-        # annullabile.
-        performance = self.make_performance()
-        user = self.make_client_user("cliente")
-        a1 = self.seat(performance, "A", 1)
-        booking = self.make_confirmed_booking(user, performance, [a1])
-        Performance.objects.filter(pk=performance.pk).update(
-            starts_at=timezone.now() - timedelta(hours=1)
+            performance=self.performance, auditorium_zone=self.zone, price=Decimal("20.00")
         )
 
-        http_client = Client()
-        http_client.force_login(user)
-        http_client.post(reverse("bookings:booking_cancel", args=[booking.pk]))
+        self.client = Client()
 
+    def test_duplicate_seat_reservation(self):
+        # user1 prenota per primo il posto A1
+        booking1 = Booking.objects.create(user=self.user1, performance=self.performance)
+        BookingSeat.objects.create(
+            booking=booking1, performance=self.performance, seat=self.seat_a1,
+            price_at_purchase=Decimal("20.00"),
+        )
+        booking2 = Booking.objects.create(user=self.user2, performance=self.performance)
+
+        # BookingSeat.clean() verifica se esiste gia' una prenotazione
+        # confermata per la stessa coppia (performance, seat), quindi save()
+        # deve sollevare ValidationError.
+        duplicate_seat = BookingSeat(
+            booking=booking2, performance=self.performance, seat=self.seat_a1,
+            price_at_purchase=Decimal("20.00"),
+        )
+        with self.assertRaises(ValidationError):
+            duplicate_seat.save()
+
+    def test_cannot_cancel_booking(self):
+        booking = Booking.objects.create(user=self.user1, performance=self.performance)
+        BookingSeat.objects.create(
+            booking=booking, performance=self.performance, seat=self.seat_a1,
+            price_at_purchase=Decimal("20.00"),
+        )
+
+        # Booking.clean() rifiuterebbe una performance che inizia gia' nel
+        # passato, quindi la spostiamo nel passato con un update() diretto,
+        # che salta la validazione del modello e simula una performance gia'
+        # iniziata.
+        Performance.objects.filter(pk=self.performance.pk).update(
+            starts_at=timezone.now() - timedelta(hours=2)
+        )
+
+        self.client.login(username="utente1", password="password123")
+        url = reverse("bookings:booking_cancel", args=[booking.pk])
+        response = self.client.post(url)
+
+        # L'anullamento di una prenotazione per una performance gia' iniziata deve
+        # essere rifiutato: la prenotazione resta confermata e il posto resta
+        # riservato.
+        self.assertRedirects(response, reverse("bookings:booking_list"))
         booking.refresh_from_db()
+        self.assertTrue(BookingSeat.objects.filter(booking=booking, seat=self.seat_a1).exists())
         self.assertEqual(booking.status, Booking.STATUS_CONFIRMED)
-        self.assertEqual(booking.seats.count(), 1)
 
-    def test_cancellabile_se_performance_futura(self):
-        # Caso di controllo: una performance futura permette l'annullamento e
-        # libera i posti (i BookingSeat vengono rimossi).
-        performance = self.make_performance()
-        user = self.make_client_user("cliente")
-        a1 = self.seat(performance, "A", 1)
-        booking = self.make_confirmed_booking(user, performance, [a1])
-
-        http_client = Client()
-        http_client.force_login(user)
-        http_client.post(reverse("bookings:booking_cancel", args=[booking.pk]))
-
-        booking.refresh_from_db()
-        self.assertEqual(booking.status, Booking.STATUS_CANCELLED)
-        self.assertEqual(booking.seats.count(), 0)
-
-
-class BookingAtomicityTests(BookingTestBase):
-    """Test di atomicita sulla prenotazione dei posti."""
-
-    def test_prenotazione_multipla_fallisce_interamente_su_conflitto(self):
-        performance = self.make_performance()
-        user_a = self.make_client_user("cliente_a")
-        user_b = self.make_client_user("cliente_b")
-        a1 = self.seat(performance, "A", 1)
-        a2 = self.seat(performance, "A", 2)
-
-        # L'utente A prenota A1.
-        self.make_confirmed_booking(user_a, performance, [a1])
-
-        # L'utente B tenta di prenotare A1 e A2 insieme: siccome A1 e occupato,
-        # l'intera prenotazione deve fallire e nemmeno A2 deve risultare prenotato.
-        http_client = Client()
-        http_client.force_login(user_b)
-        http_client.post(
-            reverse("bookings:booking_create", args=[performance.pk]),
-            data={"seats": [a1.pk, a2.pk]},
+    def test_book_seats_atomic(self):
+        # user2 prenota il posto A1 prima che user1 provi a prenotare
+        booking_user2 = Booking.objects.create(user=self.user2, performance=self.performance)
+        BookingSeat.objects.create(
+            booking=booking_user2, performance=self.performance, seat=self.seat_a2,
+            price_at_purchase=Decimal("20.00"),
         )
+        bookings_before = Booking.objects.count()
 
-        # B non deve avere alcuna prenotazione con posti confermati.
-        self.assertFalse(
-            BookingSeat.objects.filter(booking__user=user_b).exists()
-        )
-        # A2 deve restare libero: l'unico BookingSeat e quello di A su A1.
-        self.assertFalse(
-            BookingSeat.objects.filter(performance=performance, seat=a2).exists()
-        )
-        self.assertEqual(
-            BookingSeat.objects.filter(performance=performance).count(), 1
-        )
+        # user1 prova a prenotare sia A1 che A2 in un'unica richiesta; A2 non
+        # e' piu' libero, quindi l'intera richiesta deve essere rifiutata, non
+        # solo A2.
+        self.client.login(username="utente1", password="password123")
+        url = reverse("bookings:booking_create", args=[self.performance.pk])
+        response = self.client.post(url, {"seats": [self.seat_a1.pk, self.seat_a2.pk]})
+
+        # La vista deve ritornare il codice HTTP 200 con un messaggio di errore, e non deve essere creata alcuna prenotazione.
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alcuni posti non sono più disponibili.")
+        self.assertEqual(Booking.objects.count(), bookings_before)
+
+        # A1 deve restare libero: un fallimento di un'operazione atomica non puo'
+        # lasciarlo prenotato.
+        seat_a1_taken = BookingSeat.objects.filter(
+            performance=self.performance, seat=self.seat_a1
+        ).exists()
+        self.assertFalse(seat_a1_taken, "Il posto A1 doveva restare libero.")

@@ -6,7 +6,6 @@ from django.utils import timezone
 
 from apps.bookings.models import Booking
 from apps.shows.models import Performance
-from apps.theaters.models import Theater
 
 from .filters import PerformanceFilter
 
@@ -87,10 +86,6 @@ def _recommended_performances(user, base_qs, limit=4):
 	return [performance for *_ignored, performance in scored[:limit]]
 
 
-def _featured_theaters():
-	return Theater.objects.order_by("name")[:5]
-
-
 class HomeView(TemplateView):
 	template_name = "core/home.html"
 
@@ -116,7 +111,6 @@ class HomeView(TemplateView):
 			{
 				"performances": distinct_upcoming[:4],
 				"recommendations": recommendations,
-				"featured_theaters": _featured_theaters(),
 			}
 		)
 		return context

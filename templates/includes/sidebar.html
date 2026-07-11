@@ -14,18 +14,6 @@
         </div>
 
         {% if user.is_authenticated %}
-            <div class="sidebar-group">
-                <p class="sidebar-group-title">Area riservata</p>
-                {% if can_book %}
-                    <a href="{% url 'bookings:booking_list' %}" class="sidebar-link {% if namespace == 'bookings' %}sidebar-link-active{% endif %}">Prenotazioni</a>
-                {% endif %}
-                <a href="{% url 'accounts:profile' %}" class="sidebar-link {% if namespace == 'accounts' and url_name == 'profile' %}sidebar-link-active{% endif %}">Profilo</a>
-                <form action="{% url 'accounts:logout' %}" method="post">
-                    {% csrf_token %}
-                    <button class="sidebar-link sidebar-button" type="submit">Esci</button>
-                </form>
-            </div>
-
             {% if is_artist %}
                 <details class="sidebar-group sidebar-details" open>
                     <summary class="sidebar-summary">Area artista</summary>
@@ -38,7 +26,6 @@
                 <details class="sidebar-group sidebar-details" open>
                     <summary class="sidebar-summary">Gestione teatri</summary>
                     <a href="{% url 'theaters:management' %}" class="sidebar-sublink {% if namespace == 'theaters' and url_name == 'management' %}sidebar-link-active{% endif %}">Dashboard</a>
-                    <a href="{% url 'theaters:list' %}" class="sidebar-sublink {% if namespace == 'theaters' and url_name == 'list' %}sidebar-link-active{% endif %}">Lista teatri</a>
                 </details>
             {% endif %}
 
@@ -48,6 +35,18 @@
                     <a href="{% url 'accounts:admin_user_list' %}" class="sidebar-sublink {% if namespace == 'accounts' and url_name == 'admin_user_list' %}sidebar-link-active{% endif %}">Utenti e ruoli</a>
                 </details>
             {% endif %}
+
+            <div class="sidebar-group">
+                <p class="sidebar-group-title">Area riservata</p>
+                {% if can_book %}
+                    <a href="{% url 'bookings:booking_list' %}" class="sidebar-link {% if namespace == 'bookings' %}sidebar-link-active{% endif %}">Prenotazioni</a>
+                {% endif %}
+                <a href="{% url 'accounts:profile' %}" class="sidebar-link {% if namespace == 'accounts' and url_name == 'profile' %}sidebar-link-active{% endif %}">Profilo</a>
+                <form action="{% url 'accounts:logout' %}" method="post">
+                    {% csrf_token %}
+                    <button class="sidebar-link sidebar-button" type="submit">Esci</button>
+                </form>
+            </div>
         {% else %}
             <div class="sidebar-group">
                 <p class="sidebar-group-title">Accesso</p>

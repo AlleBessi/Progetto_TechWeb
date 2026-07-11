@@ -15,5 +15,5 @@ def navigation_context(request):
 		"is_manager": is_manager,
 		"is_theater_admin": is_theater_admin,
 		"can_access_dashboard": is_authenticated and (is_admin or is_manager),
-		"can_book": is_authenticated and (is_admin or (not is_artist and not is_manager and not is_theater_admin)),
+		"can_book": is_authenticated and not is_artist and not is_theater_admin,
 	}
