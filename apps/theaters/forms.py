@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.forms import inlineformset_factory
 
 from apps.core.select2_widgets import ManagerSelect2Widget
-from .models import Auditorium, AuditoriumZone, Theater
+from .models import Auditorium, AuditoriumZone, Theater, TheaterAdmin
 
 
 class TheaterForm(forms.ModelForm):
@@ -32,12 +32,14 @@ class AuditoriumForm(forms.ModelForm):
         fields = ["name", "seat_rows", "seat_cols"]
 
 
-class TheaterAdminForm(forms.Form):
-    user = forms.ModelChoiceField(
-        queryset=get_user_model().objects.filter(groups__name="manager").distinct(),
-        widget=ManagerSelect2Widget(attrs={"data-placeholder": "Seleziona un gestore..."}),
-        help_text="Seleziona un gestore",
-    )
+class TheaterAdminForm(forms.ModelForm):
+    class Meta:
+        model = TheaterAdmin
+        fields = ["user"]
+        widgets = {
+            "user": ManagerSelect2Widget(attrs={"data-placeholder": "Seleziona un gestore..."}),
+        }
+        help_texts = {"user": "Seleziona un gestore"}
 
     def __init__(self, *args, **kwargs):
         theater = kwargs.pop("theater", None)

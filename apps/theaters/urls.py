@@ -1,5 +1,7 @@
 from django.urls import path
 
+from apps.bookings import views as booking_views
+
 from . import views
 
 app_name = "theaters"
@@ -40,8 +42,8 @@ urlpatterns = [
     # ── Booking management – theater-scoped overrides ────────────────────────
     # Full user-facing booking CRUD lives in the bookings app.
     # Only theater-manager-specific actions (with theater context) live here.
-    path("management/<int:theater_id>/bookings/<int:booking_id>/edit/", views.BookingUpdateManagerView.as_view(), name="booking_update"),
-    path("management/<int:theater_id>/bookings/<int:booking_id>/cancel/", views.BookingCancelView.as_view(), name="booking_cancel"),
+    path("management/<int:theater_id>/bookings/<int:booking_id>/edit/", booking_views.BookingUpdateManager.as_view(), name="booking_update"),
+    path("management/<int:theater_id>/bookings/<int:booking_id>/cancel/", booking_views.BookingCancelManager.as_view(), name="booking_cancel"),
 
     # NOTE: Performance CRUD (create / edit / delete / confirm / reject) is
     # defined in shows/urls.py and should be linked from templates using the

@@ -14,8 +14,7 @@ class AuditoriumZonesAPI(ManagerAccessMixin, View):
 
     Access rules mirror PerformanceFormBase.test_func:
       - must be authenticated
-      - superuser OR member of "admin" group OR a TheaterAdmin for the
-        theater that owns the auditorium
+      - superuser OR a TheaterAdmin for the theater that owns the auditorium
     """
 
     auditorium: Auditorium

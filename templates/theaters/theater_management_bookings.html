@@ -20,9 +20,6 @@
             {# date_to — plain DateInput: crispy handles it natively #}
             {{ filter.form.date_to|as_crispy_field }}
 
-            {# status — SimpleSelect2: use partial #}
-            {% include "includes/select2_field.html" with field=filter.form.status only %}
-
             <div class="flex gap-2">
                 <button class="btn btn-primary btn-sm" type="submit">Filtra</button>
                 <a class="btn btn-outline btn-sm" href="{% url 'theaters:management_bookings' theater.id %}">Reset</a>
@@ -38,7 +35,6 @@
                         <th class="px-4 py-3 text-left">Utente</th>
                         <th class="px-4 py-3 text-left">Spettacolo</th>
                         <th class="px-4 py-3 text-left">Data</th>
-                        <th class="px-4 py-3 text-left">Stato</th>
                         <th class="px-4 py-3 text-right">Totale</th>
                         <th class="px-4 py-3 text-right">Azioni</th>
                     </tr>
@@ -49,24 +45,19 @@
                             <td class="px-4 py-3 text-slate-900">{{ booking.user.get_full_name|default:booking.user.username }}</td>
                             <td class="px-4 py-3 text-slate-600">{{ booking.performance.show.title }}</td>
                             <td class="px-4 py-3 text-slate-600">{{ booking.performance.starts_at|date:"d M Y H:i" }}</td>
-                            <td class="px-4 py-3 text-slate-600">{{ booking.get_status_display }}</td>
                             <td class="px-4 py-3 text-right font-medium text-slate-900">€ {{ booking.total_price }}</td>
                             <td class="px-4 py-3 text-right">
-                                {% if booking.status != 'cancelled' %}
-                                    <div class="flex flex-wrap justify-end gap-2">
-                                        <a class="btn btn-outline btn-sm" href="{% url 'theaters:booking_update' theater.id booking.id %}">Modifica</a>
-                                        <form action="{% url 'theaters:booking_cancel' theater.id booking.id %}" method="post">
-                                            {% csrf_token %}
-                                            <button class="btn btn-danger btn-sm" type="submit">Annulla</button>
-                                        </form>
-                                    </div>
-                                {% else %}
-                                    <span class="badge">Annullata</span>
-                                {% endif %}
+                                <div class="flex flex-wrap justify-end gap-2">
+                                    <a class="btn btn-outline btn-sm" href="{% url 'theaters:booking_update' theater.id booking.id %}">Modifica</a>
+                                    <form action="{% url 'theaters:booking_cancel' theater.id booking.id %}" method="post">
+                                        {% csrf_token %}
+                                        <button class="btn btn-danger btn-sm" type="submit">Annulla</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     {% empty %}
-                        <tr><td class="px-4 py-4 text-slate-600" colspan="6">Nessuna prenotazione presente.</td></tr>
+                        <tr><td class="px-4 py-4 text-slate-600" colspan="5">Nessuna prenotazione presente.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

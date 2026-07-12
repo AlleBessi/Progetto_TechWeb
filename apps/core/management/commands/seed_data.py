@@ -78,7 +78,7 @@ class Command(BaseCommand):
         Theater.objects.all().delete()
 
         # ── Roles ─────────────────────────────────────────────────────────────
-        role_names = ["admin", "artist", "manager", "client"]
+        role_names = ["artist", "manager", "client"]
         for role_name in role_names:
             Group.objects.get_or_create(name=role_name)
 
@@ -109,7 +109,7 @@ class Command(BaseCommand):
                 user.groups.add(Group.objects.get(name=group))
             return user
 
-        admin_user = create_user("admin", "admin@example.com", "Admin123!", "admin", is_superuser=True, is_staff=True)
+        admin_user = create_user("admin", "admin@example.com", "Admin123!", None, is_superuser=True, is_staff=True)
         artist_user = create_user("artista", "artista@example.com", "Artist123!", "artist")
         artist_user_2 = create_user("artista2", "artista2@example.com", "Artist123!", "artist")
         manager_user = create_user("gestore", "gestore@example.com", "Gestore123!", "manager")
@@ -260,7 +260,6 @@ class Command(BaseCommand):
             booking = Booking.objects.create(
                 user=user,
                 performance=performance,
-                status=Booking.STATUS_CONFIRMED,
             )
             total = 0
             for seat in seats:

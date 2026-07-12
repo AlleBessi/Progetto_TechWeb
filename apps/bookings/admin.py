@@ -5,8 +5,8 @@ from .models import Booking, BookingSeat
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
-	list_display = ("user", "performance", "status", "total_price", "created_at")
-	list_filter = ("status",)
+	list_display = ("user", "performance", "total_price", "created_at")
+	list_filter = ("performance",)
 
 
 @admin.register(BookingSeat)

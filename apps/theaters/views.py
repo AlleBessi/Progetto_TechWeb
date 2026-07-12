@@ -1,19 +1,20 @@
-from decimal import Decimal
 from django.contrib import messages
-from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse
-from typing import Any
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
-from django.views import View
-from django.views.generic import CreateView, DetailView, FormView, ListView, TemplateView, UpdateView
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 from django.views.generic.detail import SingleObjectMixin
-from braces.views import GroupRequiredMixin, LoginRequiredMixin
 
-from apps.bookings.models import Booking, BookingSeat
-from apps.bookings.forms import BookingForm
+from apps.bookings.models import BookingSeat
 from apps.bookings.utils import build_zone_layout, calculate_occupancy, performance_rows
-from apps.core.mixins import ManagerAccessMixin
+from braces.views import LoginRequiredMixin, SuperuserRequiredMixin
+
+from apps.core.mixins import (
+    ManagerAccessMixin,
+    TheaterManagementContextMixin,
+    TheaterManagerRequiredMixin,
+    TheaterScopedMixin,
+)
 from apps.shows.models import Performance
 
 from .forms import AuditoriumForm, AuditoriumZoneFormSet, TheaterAdminForm, TheaterForm
@@ -52,69 +53,22 @@ class TheaterDetailView(DetailView):
         return context
 
 
-class TheaterScopedMixin:
-    request: Any
-    kwargs: dict[str, Any]
-
-    def get_theater(self) -> Theater:
-        if not hasattr(self, "_theater_cache"):
-            theater_id = self.kwargs.get("theater_id")
-            if theater_id is None:
-                raise AttributeError("theater_id is required for this view")
-            self._theater_cache = get_object_or_404(Theater, pk=theater_id)
-        return self._theater_cache
-
-    def get_theater_queryset(self):
-        return Theater.objects.accessible_by(self.request.user)  # type: ignore[attr-defined]
-
-
-# ---------------------------------------------------------------------------
-# Management — shared context mixin
-# ---------------------------------------------------------------------------
-
-class TheaterManagementContextMixin(TheaterScopedMixin, ManagerAccessMixin):
-    """Injects ``theater`` and ``admin_allowed`` into every management view."""
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)  # type: ignore[attr-defined]
-        context.setdefault("theater", self.get_theater())
-        context.setdefault("admin_allowed", True)
-        return context
-
-
 # ---------------------------------------------------------------------------
 # Management — theater-level views
 # ---------------------------------------------------------------------------
 
-class ManagementDashboardView(LoginRequiredMixin, ListView):
+class ManagementDashboardView(TheaterManagerRequiredMixin, ListView):
     model = Theater
     template_name = "theaters/management_dashboard.html"
     context_object_name = "theaters"
- 
-    def _user_is_privileged(self):
-        user = self.request.user
-        return (
-            user.is_superuser
-            or user.groups.filter(name__in=["admin", "manager"]).exists()
-        )
- 
-    def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_authenticated or not self._user_is_privileged():
-            from django.contrib.auth.views import redirect_to_login
-            return redirect_to_login(request.get_full_path())
-        return super().dispatch(request, *args, **kwargs)
- 
+
     def get_queryset(self):
         return Theater.objects.accessible_by(self.request.user).order_by("name")
  
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        user = self.request.user
-        # Only admins / superusers may create or delete theaters.
-        context["can_create_delete"] = (
-            user.is_superuser
-            or user.groups.filter(name="admin").exists()
-        )
+        # Only superusers (admins) may create or delete theaters.
+        context["can_create_delete"] = self.request.user.is_superuser
         return context
 
 
@@ -215,7 +169,6 @@ class TheaterOccupancyDetailView(TheaterManagementContextMixin, TemplateView):
         reserved = set(
             BookingSeat.objects
             .for_performance(performance)
-            .confirmed()
             .reserved_seat_ids()
         )
         zone_layout = build_zone_layout(performance, reserved)
@@ -229,15 +182,14 @@ class TheaterOccupancyDetailView(TheaterManagementContextMixin, TemplateView):
         return context
 
 
-class TheaterCreateView(LoginRequiredMixin, GroupRequiredMixin, TheaterScopedMixin, CreateView):
-    """Create a new theater. Restricted to the 'admin' group and superusers."""
-    group_required = ["admin"]
+class TheaterCreateView(LoginRequiredMixin, SuperuserRequiredMixin, CreateView):
+    """Create a new theater. Restricted to superusers (admins)."""
+    raise_exception = True
     model = Theater
     form_class = TheaterForm
     template_name = "theaters/theater_form.html"
     object: Theater
-    raise_exception = True
- 
+
     def form_valid(self, form):
         response = super().form_valid(form)
         messages.success(self.request, "Teatro creato.")
@@ -248,7 +200,7 @@ class TheaterCreateView(LoginRequiredMixin, GroupRequiredMixin, TheaterScopedMix
 
 
 
-class TheaterUpdateView(TheaterScopedMixin, ManagerAccessMixin, UpdateView):
+class TheaterUpdateView(ManagerAccessMixin, UpdateView):
     model = Theater
     form_class = TheaterForm
     template_name = "theaters/theater_form.html"
@@ -257,7 +209,7 @@ class TheaterUpdateView(TheaterScopedMixin, ManagerAccessMixin, UpdateView):
     object: Theater
 
     def get_queryset(self):
-        return self.get_theater_queryset()
+        return Theater.objects.accessible_by(self.request.user)
 
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -268,29 +220,28 @@ class TheaterUpdateView(TheaterScopedMixin, ManagerAccessMixin, UpdateView):
         return reverse("theaters:management_data", kwargs={"theater_id": self.object.pk})
 
 
-class TheaterDeleteView(GroupRequiredMixin, TheaterScopedMixin, SingleObjectMixin, View):
-    """Delete a theater. Restricted to the 'admin' group and superusers."""
-    group_required = ["admin"]
+class TheaterDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, DeleteView):
+    """Delete a theater. Restricted to superusers (admins)."""
+    raise_exception = True
     model = Theater
     pk_url_kwarg = "theater_id"
-    object: Theater
-    raise_exception = True
- 
+    http_method_names = ["post"]
+    success_url = reverse_lazy("theaters:management")
+
     def get_queryset(self):
-        return self.get_theater_queryset()
- 
-    def get_object(self, queryset=None) -> Theater:
-        self.object = super().get_object(queryset)
-        return self.object
- 
+        return Theater.objects.accessible_by(self.request.user)
+
     def post(self, request, *args, **kwargs):
         theater = self.get_object()
         if Performance.objects.filter(auditorium__theater=theater).exists():
             messages.error(request, "Non puoi eliminare un teatro con performance associate.")
             return redirect("theaters:management_detail", theater_id=theater.pk)
-        theater.delete()
-        messages.success(request, "Teatro eliminato.")
-        return redirect("theaters:management")
+        return super().post(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, "Teatro eliminato.")
+        return response
 
 
 
@@ -312,30 +263,25 @@ class TheaterAdminListView(TheaterManagementContextMixin, ListView):
             .select_related("user")
             .order_by("user__username")
         )
- 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        return context
 
- 
-class TheaterAdminAddView(TheaterManagementContextMixin, FormView):
-    """Form to select and assign a new manager to the theater.
- 
-    Uses FormView instead of CreateView because TheaterAdminForm is a plain
-    forms.Form (not a ModelForm).
-    """
- 
-    template_name = "theaters/theater_admin_add.html"
+
+class TheaterAdminAddView(TheaterManagementContextMixin, CreateView):
+    """Assign a new manager to the theater."""
+
+    model = TheaterAdmin
     form_class = TheaterAdminForm
- 
+    template_name = "theaters/theater_admin_add.html"
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["theater"] = self.get_theater()
         return kwargs
- 
+
     def form_valid(self, form):
         theater = self.get_theater()
         user = form.cleaned_data["user"]
+        # Idempotent: re-adding an existing manager must not violate
+        # unique_together(theater, user).
         TheaterAdmin.objects.get_or_create(theater=theater, user=user)
         messages.success(
             self.request,
@@ -344,24 +290,37 @@ class TheaterAdminAddView(TheaterManagementContextMixin, FormView):
         return redirect("theaters:management_admins", theater_id=theater.pk)
 
  
-class TheaterAdminRemoveView(TheaterScopedMixin, ManagerAccessMixin, View):
+class TheaterAdminRemoveView(TheaterScopedMixin, ManagerAccessMixin, DeleteView):
     """Remove a manager from the theater (POST only).
- 
-    Uses a plain View instead of DeleteView because the URL carries user_id
-    (a FK), not the TheaterAdmin pk.
+
+    The URL carries theater_id + user_id (not the TheaterAdmin pk), so the
+    lookup is scoped to the theater and keyed on user_id via slug_field.
     """
- 
-    def post(self, request, theater_id, user_id):
-        theater = self.get_theater()
-        if TheaterAdmin.objects.filter(theater=theater).count() <= 1:
+
+    model = TheaterAdmin
+    http_method_names = ["post"]
+    slug_field = "user_id"
+    slug_url_kwarg = "user_id"
+
+    def get_queryset(self):
+        return TheaterAdmin.objects.filter(theater=self.get_theater())
+
+    def post(self, request, *args, **kwargs):
+        if TheaterAdmin.objects.filter(theater=self.get_theater()).count() <= 1:
             messages.error(request, "Deve rimanere almeno un gestore assegnato al teatro.")
-            return redirect("theaters:management_admins", theater_id=theater.pk)
-        TheaterAdmin.objects.filter(theater=theater, user_id=user_id).delete()
-        messages.success(request, "Gestore rimosso dal teatro.")
-        if request.user.id == user_id:
-            messages.info(request, "Hai rimosso te stesso come gestore, stai tornando alla dashboard.")
-            return redirect("theaters:management")
-        return redirect("theaters:management_admins", theater_id=theater.pk)
+            return redirect("theaters:management_admins", theater_id=self.get_theater().pk)
+        return super().post(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, "Gestore rimosso dal teatro.")
+        return response
+
+    def get_success_url(self):
+        if self.request.user.id == self.kwargs["user_id"]:
+            messages.info(self.request, "Hai rimosso te stesso come gestore, stai tornando alla dashboard.")
+            return reverse("theaters:management")
+        return reverse("theaters:management_admins", kwargs={"theater_id": self.get_theater().pk})
 
  
 # ---------------------------------------------------------------------------
@@ -401,10 +360,6 @@ class AuditoriumManageView(TheaterScopedMixin, ManagerAccessMixin, SingleObjectM
     template_name = "theaters/auditorium_manage.html"
     model = Auditorium
     pk_url_kwarg = "auditorium_id"
-
-    def get_object(self, queryset=None) -> Auditorium:
-        self.object = super().get_object(queryset)
-        return self.object
 
     def get_queryset(self):
         # Scope the lookup to auditoriums belonging to the current theater.
@@ -459,157 +414,29 @@ class AuditoriumManageView(TheaterScopedMixin, ManagerAccessMixin, SingleObjectM
         )
 
 
-class AuditoriumDeleteView(TheaterScopedMixin, ManagerAccessMixin, SingleObjectMixin, View):
+class AuditoriumDeleteView(TheaterScopedMixin, ManagerAccessMixin, DeleteView):
     model = Auditorium
     pk_url_kwarg = "auditorium_id"
-
-    def get_object(self, queryset=None) -> Auditorium:
-        self.object = super().get_object(queryset)
-        return self.object
+    http_method_names = ["post"]
 
     def get_queryset(self):
         return Auditorium.objects.filter(theater=self.get_theater())
 
     def post(self, request, *args, **kwargs):
-        auditorium = self.get_object()
-        theater = self.get_theater()
-        
-        if Performance.objects.filter(auditorium=auditorium).exists():
+        if Performance.objects.filter(auditorium=self.get_object()).exists():
             messages.error(request, "Non puoi eliminare una sala con performance associate.")
-            return redirect("theaters:management_data", theater_id=theater.pk)
-        auditorium.delete()
-        messages.success(request, "Sala eliminata.")
-        return redirect("theaters:management_data", theater_id=theater.pk)
+            return redirect("theaters:management_data", theater_id=self.get_theater().pk)
+        return super().post(request, *args, **kwargs)
 
-
-# ---------------------------------------------------------------------------
-# Management — booking views
-# ---------------------------------------------------------------------------
-
-class BookingCancelView(TheaterScopedMixin, ManagerAccessMixin, SingleObjectMixin, View):
-    """Cancel a booking scoped to the current theater."""
-
-    model = Booking
-    pk_url_kwarg = "booking_id"
-
-    def get_object(self, queryset=None) -> Booking:
-        self.object = super().get_object(queryset)
-        return self.object
-
-    def get_queryset(self):
-        return Booking.objects.filter(performance__auditorium__theater=self.get_theater())
-
-    def post(self, request, *args, **kwargs):
-        booking = self.get_object()
-        if booking.status != Booking.STATUS_CANCELLED:
-            booking.status = Booking.STATUS_CANCELLED
-            booking.save(update_fields=["status"])
-            messages.success(request, "Prenotazione annullata dalla gestione teatro.")
-        return redirect("theaters:management_bookings", theater_id=self.get_theater().pk)
-
-
-class BookingUpdateManagerView(TheaterScopedMixin, ManagerAccessMixin, SingleObjectMixin, FormView):
-    """Update a booking's seats on behalf of a manager.
-
-    SingleObjectMixin provides get_object() / get_queryset() for the Booking
-    lookup, automatically scoped to the current theater via get_queryset().
-    self.object is set once in dispatch and reused everywhere — no manual
-    caching needed.
-    """
-
-    template_name = "bookings/booking_update_manager.html"
-    model = Booking
-    pk_url_kwarg = "booking_id"
-    object: Booking
-
-    def get_object(self, queryset=None) -> Booking:
-        self.object = super().get_object(queryset)
-        return self.object
-
-    def get_queryset(self):
-        return (
-            Booking.objects.filter(performance__auditorium__theater=self.get_theater())
-            .select_related("performance__auditorium", "performance__show")
-        )
-
-    def dispatch(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        if self.object.status == Booking.STATUS_CANCELLED:
-            messages.error(request, "Prenotazione annullata, non modificabile.")
-            return redirect("theaters:management_bookings", theater_id=self.get_theater().pk)
-        if self.object.performance.status != Performance.STATUS_SCHEDULED or self.object.performance.starts_at < timezone.now():
-            messages.error(request, "Performance non disponibile per la modifica.")
-            return redirect("theaters:management_bookings", theater_id=self.get_theater().pk)
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_form(self, form_class=None):
-        return BookingForm(self.object.performance, **self.get_form_kwargs())
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs["exclude_booking"] = self.object
-        if self.request.method not in ("POST", "PUT"):
-            kwargs.pop("data", None)
-            kwargs.pop("files", None)
-        return kwargs
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        performance = self.object.performance
-        seat_rows = BookingSeat.objects.filter(performance=performance).values_list(
-            "seat_id", "booking_id", "booking__status"
-        )
-        reserved = {
-            seat_id
-            for seat_id, booking_id, booking_status in seat_rows
-            if booking_id != self.object.pk and booking_status == Booking.STATUS_CONFIRMED
-        }
-        selected_ids = {
-            seat_id
-            for seat_id, booking_id, _ in seat_rows
-            if booking_id == self.object.pk
-        }
-        context.update({
-            "theater": self.get_theater(),
-            "booking": self.object,
-            "performance": performance,
-            "zone_layout": build_zone_layout(performance, reserved, selected_ids),
-        })
-        return context
+    def get_success_url(self):
+        return reverse("theaters:management_data", kwargs={"theater_id": self.get_theater().pk})
 
     def form_valid(self, form):
-        booking = self.object
-        performance = booking.performance
-        selected_seats = list(form.cleaned_data["seats"])
+        response = super().form_valid(form)
+        messages.success(self.request, "Sala eliminata.")
+        return response
 
-        with transaction.atomic():
-            reserved_ids = set(
-                BookingSeat.objects.filter(
-                    performance=performance,
-                    booking__status=Booking.STATUS_CONFIRMED,
-                )
-                .exclude(booking=booking)
-                .select_for_update()
-                .values_list("seat_id", flat=True)
-            )
-            if any(s.id in reserved_ids for s in selected_seats):
-                form.add_error("seats", "Alcuni posti non sono più disponibili.")
-                return self.form_invalid(form)
 
-            seat_prices = [
-                (seat, performance.zone_price(seat.auditorium_zone))
-                for seat in selected_seats
-            ]
-            BookingSeat.objects.filter(booking=booking).delete()
-            for seat, price in seat_prices:
-                BookingSeat.objects.create(
-                    booking=booking,
-                    performance=performance,
-                    seat=seat,
-                    price_at_purchase=price,
-                )
-            booking.total_price = sum((price for _, price in seat_prices), Decimal("0.00"))
-            booking.save(update_fields=["total_price"])
-
-        messages.success(self.request, "Prenotazione aggiornata.")
-        return redirect("theaters:management_bookings", theater_id=self.get_theater().pk)
+# NOTE: Booking cancel/update for managers now live in apps.bookings.views
+# (BookingCancelManager / BookingUpdateManager) and are routed from this app's
+# urls.py under the theaters: namespace.

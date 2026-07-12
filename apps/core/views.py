@@ -32,13 +32,11 @@ def _recommended_performances(user, base_qs, limit=4):
 	if not user.is_authenticated:
 		return []
 
-	# Personal affinity signals, derived from the user's confirmed bookings.
+	# Personal affinity signals, derived from the user's bookings.
 	category_weights: dict[int, int] = {}
 	artist_weights: dict[int, int] = {}
 	booked_show_ids: set[int] = set()
-	history = Booking.objects.filter(
-		user=user, status=Booking.STATUS_CONFIRMED
-	).values_list(
+	history = Booking.objects.filter(user=user).values_list(
 		"performance__show_id",
 		"performance__show__category_id",
 		"performance__show__artist_id",
@@ -63,10 +61,9 @@ def _recommended_performances(user, base_qs, limit=4):
 
 	candidate_show_ids = list(perf_by_show)
 
-	# Global popularity: confirmed bookings per candidate show (one aggregate).
+	# Global popularity: bookings per candidate show (one aggregate).
 	popularity = dict(
 		Booking.objects.filter(
-			status=Booking.STATUS_CONFIRMED,
 			performance__show__in=candidate_show_ids,
 		)
 		.values("performance__show")

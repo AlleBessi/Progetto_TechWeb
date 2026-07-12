@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from apps.bookings.models import Booking, BookingSeat
+from apps.bookings.models import BookingSeat
 
 
 def build_zone_layout(performance, reserved_ids, selected_ids=None):
@@ -53,17 +53,14 @@ def build_zone_layout(performance, reserved_ids, selected_ids=None):
 def performance_rows(performances):
     rows = []
     for performance in performances:
-        confirmed_booked = BookingSeat.objects.filter(
-            performance=performance,
-            booking__status=Booking.STATUS_CONFIRMED,
-        ).count()
+        booked = BookingSeat.objects.filter(performance=performance).count()
         total_seats = performance.auditorium.seats.count()
-        occupancy = round((confirmed_booked / total_seats) * 100, 1) if total_seats else 0
+        occupancy = round((booked / total_seats) * 100, 1) if total_seats else 0
         rows.append(
             {
                 "performance": performance,
                 "total_seats": total_seats,
-                "booked_seats": confirmed_booked,
+                "booked_seats": booked,
                 "occupancy": occupancy,
             }
         )
@@ -76,7 +73,6 @@ def calculate_occupancy(performance, zone_layout):
         total = sum(len(seats) for _row, seats in zone_info["rows"])
         booked = BookingSeat.objects.filter(
             performance=performance,
-            booking__status=Booking.STATUS_CONFIRMED,
             seat__auditorium_zone=zone_info["zone"],
         ).count()
         percentage = round((booked / total) * 100, 1) if total else 0

@@ -72,15 +72,9 @@ class BookingManagementFilter(django_filters.FilterSet):
         lookup_expr="date__lte",
         widget=forms.DateInput(attrs={"type": "date"}),
     )
-    status = django_filters.ChoiceFilter(
-        label="Stato",
-        choices=Booking.STATUS_CHOICES,
-        widget=SimpleSelect2Widget(),
-    )
-
     class Meta:
         model = Booking
-        fields = ["show", "customer", "date_from", "date_to", "status"]
+        fields = ["show", "customer", "date_from", "date_to"]
 
     def filter_customer(self, queryset, name, value):
         if not value:

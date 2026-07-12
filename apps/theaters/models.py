@@ -13,7 +13,7 @@ from django.db.models import Max
 class TheaterQuerySet(models.QuerySet):
     def accessible_by(self, user):
         """Return only the theaters the given user is allowed to manage."""
-        if user.is_superuser or user.groups.filter(name="admin").exists():
+        if user.is_superuser:
             return self
         return self.filter(admins__user=user)
 

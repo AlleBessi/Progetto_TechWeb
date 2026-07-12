@@ -1,11 +1,11 @@
-from django.contrib.auth.mixins import LoginRequiredMixin
-from braces.views import GroupRequiredMixin
 from django.contrib import messages
 from django.contrib.auth.models import Group, User
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, FormView, ListView, UpdateView, DeleteView
 from django.contrib.auth.forms import SetPasswordForm
+
+from braces.views import LoginRequiredMixin, SuperuserRequiredMixin
 
 from .forms import AdminUserCreateForm, ProfileForm, RegistrationForm, AdminUserUpdateForm
 
@@ -62,12 +62,11 @@ class ProfileView(LoginRequiredMixin, FormView):
 		return super().form_valid(form)
 
 
-class AdminUserListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
+class AdminUserListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
+    raise_exception = True
     model = User
     template_name = "accounts/admin_user_list.html"
     context_object_name = "users"
-    group_required = ("admin",)
-    raise_exception = True
 
     def get_queryset(self):
         return User.objects.order_by("username")
@@ -81,11 +80,10 @@ class AdminUserListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
         return context
 
 
-class AdminUserCreateView(LoginRequiredMixin, GroupRequiredMixin, CreateView):
+class AdminUserCreateView(LoginRequiredMixin, SuperuserRequiredMixin, CreateView):
+    raise_exception = True
     form_class = AdminUserCreateForm
     template_name = "accounts/admin_user_form.html"
-    group_required = ("admin",)
-    raise_exception = True
 
     def form_valid(self, form):
         user = form.save(commit=False)
@@ -96,13 +94,12 @@ class AdminUserCreateView(LoginRequiredMixin, GroupRequiredMixin, CreateView):
         return redirect("accounts:admin_user_list")
 
 
-class AdminUserUpdateView(LoginRequiredMixin, GroupRequiredMixin, UpdateView):
+class AdminUserUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView):
+    raise_exception = True
     model = User
     form_class = AdminUserUpdateForm
     template_name = "accounts/admin_user_edit_form.html"
     pk_url_kwarg = "user_id"
-    group_required = ("admin",)
-    raise_exception = True
 
     def form_valid(self, form):
         user = form.save()
@@ -116,11 +113,10 @@ class AdminUserUpdateView(LoginRequiredMixin, GroupRequiredMixin, UpdateView):
         return context
 
 
-class AdminUserDeleteView(LoginRequiredMixin, GroupRequiredMixin, DeleteView):
+class AdminUserDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, DeleteView):
+    raise_exception = True
     model = User
     pk_url_kwarg = "user_id"
-    group_required = ("admin",)
-    raise_exception = True
 
     def post(self, request,  *args, **kwargs):
         target = self.get_object()
@@ -132,11 +128,10 @@ class AdminUserDeleteView(LoginRequiredMixin, GroupRequiredMixin, DeleteView):
         return redirect("accounts:admin_user_list")
     
 
-class AdminUserSetPasswordView(LoginRequiredMixin, GroupRequiredMixin, FormView):
+class AdminUserSetPasswordView(LoginRequiredMixin, SuperuserRequiredMixin, FormView):
+    raise_exception = True
     form_class = SetPasswordForm
     template_name = "accounts/admin_user_set_password.html"
-    group_required = ("admin",)
-    raise_exception = True
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)

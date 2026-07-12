@@ -16,7 +16,7 @@ class BookingForm(forms.Form):
     def __init__(self, performance, *args, exclude_booking=None, **kwargs):
         super().__init__(*args, **kwargs)
 
-        reserved_qs = BookingSeat.objects.for_performance(performance).confirmed()
+        reserved_qs = BookingSeat.objects.for_performance(performance)
 
         if exclude_booking:
             reserved_qs = reserved_qs.exclude(booking=exclude_booking)

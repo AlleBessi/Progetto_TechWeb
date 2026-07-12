@@ -1,7 +1,7 @@
 def navigation_context(request):
 	user = getattr(request, "user", None)
 	is_authenticated = bool(user and user.is_authenticated)
-	is_admin = bool(is_authenticated and (user.is_superuser or user.groups.filter(name="admin").exists()))
+	is_admin = bool(is_authenticated and user.is_superuser)
 	is_artist = bool(is_authenticated and user.groups.filter(name="artist").exists())
 	is_manager = bool(is_authenticated and user.groups.filter(name="manager").exists())
 	# Any manager (or admin) sees the "Gestione teatri" menu, even when not yet

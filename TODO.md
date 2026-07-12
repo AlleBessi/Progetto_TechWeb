@@ -19,3 +19,6 @@
 [] ui - se nessun teatro assegnato al manager mostrare comunque menu nella navbar e nella lista teatri dire "nessun teatro da gestire"
 [-] booking - reverse pages (lazy or not lazy?), calcolo totale prenotazione
 [] show detail - "Prezzi per zona disponibili"
+
+
+[] AuditoriumManageView 

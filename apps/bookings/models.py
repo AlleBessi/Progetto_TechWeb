@@ -21,12 +21,6 @@ class BookingQuerySet(models.QuerySet["Booking"]):
     def for_theater(self, theater: Theater) -> "BookingQuerySet":
         return self.filter(performance__auditorium__theater=theater)
 
-    def confirmed(self) -> "BookingQuerySet":
-        return self.filter(status=Booking.STATUS_CONFIRMED)
-
-    def cancelled(self) -> "BookingQuerySet":
-        return self.filter(status=Booking.STATUS_CANCELLED)
-
     def with_full_details(self) -> "BookingQuerySet":
         """Attach all data needed for list/detail views in a single pass."""
         return (
@@ -39,13 +33,30 @@ class BookingSeatQuerySet(models.QuerySet["BookingSeat"]):
     def for_performance(self, performance: Performance) -> "BookingSeatQuerySet":
         return self.filter(performance=performance)
 
-    def confirmed(self) -> "BookingSeatQuerySet":
-        """Only seats whose booking is confirmed."""
-        return self.filter(booking__status=Booking.STATUS_CONFIRMED)
-
     def reserved_seat_ids(self):
-        """Flat queryset of seat PKs — chain after for_performance().confirmed()."""
+        """Flat queryset of seat PKs — chain after for_performance()."""
         return self.values_list("seat_id", flat=True)
+
+    def conflicting_seat_ids(
+        self, performance, seat_ids, exclude_booking=None, exclude_pk=None, lock=False
+    ) -> set:
+        """Seat IDs among ``seat_ids`` already held by a booking for
+        ``performance``.
+
+        The single source of truth for seat-availability. Views pass
+        ``lock=True`` inside a transaction for a race-safe
+        (``SELECT ... FOR UPDATE``) check; ``exclude_booking`` skips a booking's
+        own seats (updates) and ``exclude_pk`` skips a single row (model
+        self-validation).
+        """
+        qs = self.for_performance(performance).filter(seat_id__in=seat_ids)
+        if exclude_booking is not None:
+            qs = qs.exclude(booking=exclude_booking)
+        if exclude_pk is not None:
+            qs = qs.exclude(pk=exclude_pk)
+        if lock:
+            qs = qs.select_for_update()
+        return set(qs.reserved_seat_ids())
 
 
 BookingManager = models.Manager.from_queryset(BookingQuerySet)
@@ -57,21 +68,11 @@ BookingSeatManager = models.Manager.from_queryset(BookingSeatQuerySet)
 # ---------------------------------------------------------------------------
 
 class Booking(models.Model):
-    STATUS_CONFIRMED = "confirmed"
-    STATUS_CANCELLED = "cancelled"
-    STATUS_CHOICES = [
-        (STATUS_CONFIRMED, "Confirmed"),
-        (STATUS_CANCELLED, "Cancelled"),
-    ]
-
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="bookings"
     )
     performance = models.ForeignKey(
         "shows.Performance", on_delete=models.CASCADE, related_name="bookings"
-    )
-    status = models.CharField(
-        max_length=20, choices=STATUS_CHOICES, default=STATUS_CONFIRMED
     )
     total_price = models.DecimalField(max_digits=9, decimal_places=2, default=Decimal("0.00"))
     created_at = models.DateTimeField(auto_now_add=True)
@@ -104,7 +105,6 @@ class Booking(models.Model):
         self.full_clean()
         super().save(*args, **kwargs)
 
-
 class BookingSeat(models.Model):
     booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name="seats")
     performance = models.ForeignKey(
@@ -126,14 +126,8 @@ class BookingSeat(models.Model):
             if self.booking.performance.pk != self.performance.pk:
                 raise ValidationError("Booking and performance must match.")
         if self.performance_id and self.seat_id:
-            conflict = (
-                BookingSeat.objects.filter(
-                    performance_id=self.performance_id,
-                    seat_id=self.seat_id,
-                    booking__status=Booking.STATUS_CONFIRMED,
-                )
-                .exclude(pk=self.pk)
-                .exists()
+            conflict = BookingSeat.objects.conflicting_seat_ids(
+                self.performance_id, [self.seat_id], exclude_pk=self.pk
             )
             if conflict:
                 raise ValidationError("Questo posto e' gia' stato prenotato.")
