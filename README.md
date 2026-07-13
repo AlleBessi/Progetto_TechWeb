@@ -10,7 +10,7 @@ L'applicazione è divisa nelle seguenti viste:
 
 - **Utente non registrato**
 
-    Un utente non registrato può cercare teatri e spettacoli tramite i filtri di ricerca, consultare le schede dei teatri e degli spettacoli, e visualizzare le date, gli orari e la disponibilità dei posti delle rappresentazioni in programmazione. Non può però effettuare alcuna prenotazione: per farlo è necessario registrarsi e accedere.
+    Un utente non registrato può cercare teatri e spettacoli tramite i filtri di ricerca, consultare le schede dei teatri e degli spettacoli, e visualizzare le date e gli orari delle rappresentazioni in programmazione. Non può però effettuare alcuna prenotazione: per farlo è necessario registrarsi e accedere.
 
 - **Utente standard (cliente)**
 
@@ -26,11 +26,11 @@ L'applicazione è divisa nelle seguenti viste:
 
     L'artista può inserire sulla piattaforma i propri spettacoli teatrali, specificando informazioni come titolo, descrizione, categoria, durata e locandina.
 
-    Per evitare che una rappresentazione entri in programmazione senza il consenso dell'artista, ogni rappresentazione proposta da un amministratore per uno spettacolo dell'artista resta in attesa (`pending_artist_confirmation`) finché l'artista non la **conferma**. Solo dopo la conferma la rappresentazione diventa programmata (`scheduled`) e prenotabile dagli utenti; l'artista può in alternativa **rifiutarla**.
+    Per evitare che una rappresentazione entri in programmazione senza il consenso dell'artista, ogni rappresentazione proposta da un gestore per uno spettacolo dell'artista resta in attesa (`pending_artist_confirmation`) finché l'artista non la **conferma**. Solo dopo la conferma la rappresentazione diventa programmata (`scheduled`) e prenotabile dagli utenti; l'artista può in alternativa **rifiutarla**.
 
 - **Amministratore di teatro (gestore)**
 
-    Ogni teatro può essere gestito da uno o più amministratori. Dalla propria dashboard, l'amministratore di teatro organizza la programmazione del teatro scegliendo gli spettacoli proposti dagli artisti e assegnando sale, date e orari delle rappresentazioni.
+    Ogni teatro può essere gestito da uno o più gestore. Dalla propria dashboard, l'amministratore di teatro organizza la programmazione del teatro scegliendo gli spettacoli proposti dagli artisti e assegnando sale, date e orari delle rappresentazioni.
 
     Può inoltre gestire le sale e le zone della sala, la disponibilità dei posti e i prezzi dei biglietti per zona, oltre ad assegnare eventualmente altri utenti come amministratori dello stesso teatro. L'ambito di gestione di un amministratore di teatro è limitato ai teatri a cui è stato assegnato.
 
@@ -41,14 +41,11 @@ L'applicazione è divisa nelle seguenti viste:
 ### Struttura dei dati
 Il dominio è modellato attorno alle seguenti entità principali:
 
-- **Teatro** — una struttura con le proprie informazioni (nome, indirizzo, città, ecc.) e una o più sale.
+- **Teatro** (`Theater`) — una struttura con le proprie informazioni (nome, indirizzo, città, ecc.) e una o più sale.
 - **Sala** (`Auditorium`) — appartiene a un teatro ed è suddivisa in **zone** (`AuditoriumZone`); da righe e posti per riga di ogni zona vengono generati automaticamente i **posti** (`Seat`).
 - **Spettacolo** (`Show`) — creato da un artista, con titolo, descrizione, categoria, durata e locandina.
 - **Rappresentazione** (`Performance`) — uno spettacolo in una sala a una certa data/ora, con un ciclo di vita (in attesa di conferma dell'artista → programmata → annullata) e un prezzo per zona (`PerformancePrice`).
 - **Prenotazione** (`Booking`) — associa un utente a una rappresentazione, con i posti prenotati (`BookingSeat`). L'unicità del posto per rappresentazione è garantita a livello di database.
-
-### Aggiornamento realtime dei posti disponibili
-La prenotazione dei posti avviene in modo sicuro anche in presenza di più utenti collegati contemporaneamente sulla stessa rappresentazione: al momento della prenotazione i posti confermati vengono bloccati (`select_for_update`) all'interno di una transazione, i conflitti vengono ricontrollati e il vincolo di unicità a livello di database impedisce definitivamente la doppia prenotazione dello stesso posto.
 
 ### Test del software
 Sono stati realizzati tre test differenti all'interno del progetto (in `apps/bookings/tests.py`):
@@ -74,17 +71,3 @@ Oltre a **Django** (framework principale) e **Pillow** (gestione delle immagini 
 - **django-select2** — campi di selezione avanzati con ricerca (widget Select2) nei form di gestione di spettacoli, rappresentazioni e amministratori.
 - **django-braces** — mixin aggiuntivi per le viste basate su classi; in particolare `GroupRequiredMixin` per il controllo degli accessi in base al gruppo/ruolo dell'utente.
 
-### Avvio rapido
-1. Attiva il virtualenv:
-   - Linux/macOS: `source .venv/bin/activate`
-2. Installa le dipendenze:
-   - `pip install -r requirements.txt`
-3. Applica le migrazioni:
-   - `python manage.py migrate`
-4. (Opzionale) Popola il database con dati di esempio:
-   - `python manage.py seed_data`
-5. Avvia il server:
-   - `python manage.py runserver`
-
-Per eseguire i test:
-- `python manage.py test`

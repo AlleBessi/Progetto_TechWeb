@@ -2,7 +2,7 @@ from django.urls import path
 
 from apps.bookings import views as booking_views
 
-from . import views
+from . import api, views
 
 app_name = "theaters"
 
@@ -38,6 +38,9 @@ urlpatterns = [
     path("management/<int:theater_id>/auditoriums/new/", views.AuditoriumCreateView.as_view(), name="auditorium_create"),
     path("management/<int:theater_id>/auditoriums/<int:auditorium_id>/", views.AuditoriumManageView.as_view(), name="auditorium_update"),
     path("management/<int:theater_id>/auditoriums/<int:auditorium_id>/delete/", views.AuditoriumDeleteView.as_view(), name="auditorium_delete"),
+
+    # ── Internal API ─────────────────────────────────────────────────────────
+    path("api/auditoriums/<int:auditorium_id>/zones/", api.AuditoriumZonesAPI.as_view(), name="api_auditorium_zones"),
 
     # ── Booking management – theater-scoped overrides ────────────────────────
     # Full user-facing booking CRUD lives in the bookings app.

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import api, views
+from . import views
 
 app_name = "shows"
 
@@ -25,7 +25,4 @@ urlpatterns = [
     # Workflow actions (confirm / reject by artist)
     path("performances/<int:performance_id>/confirm/", views.PerformanceConfirmView.as_view(action="confirm"), name="performance_confirm"),
     path("performances/<int:performance_id>/reject/", views.PerformanceConfirmView.as_view(action="reject"), name="performance_reject"),
-
-    # ── Internal API ─────────────────────────────────────────────────────────
-    path("api/auditoriums/<int:auditorium_id>/zones/", api.AuditoriumZonesAPI.as_view(), name="api_auditorium_zones"),
 ]

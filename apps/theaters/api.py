@@ -7,7 +7,7 @@ from apps.theaters.models import Auditorium
 
 class AuditoriumZonesAPI(ManagerAccessMixin, View):
     """
-    GET /api/shows/auditoriums/<auditorium_id>/zones/
+    GET /theaters/api/auditoriums/<auditorium_id>/zones/
 
     Returns the zones for a given auditorium so the performance form can
     rebuild the price fields on the client when the auditorium changes.

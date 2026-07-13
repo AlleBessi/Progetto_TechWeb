@@ -92,7 +92,7 @@
 
     // Build the URL by reversing via Django, then replacing the sentinel 0 with
     // the real auditorium id at call time — keeps JS free of hardcoded paths.
-    const urlTemplate = "{% url 'shows:api_auditorium_zones' auditorium_id=0 %}"
+    const urlTemplate = "{% url 'theaters:api_auditorium_zones' auditorium_id=0 %}"
                             .replace("/0/", "/__ID__/");
 
     function buildZoneField(zone) {
