@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}{% if view.action == "confirm" %}Conferma performance{% else %}Rifiuta performance{% endif %}{% endblock %}
+
+{% block content %}
+<div class="card p-6 max-w-xl mx-auto">
+    <h1 class="section-title mb-2">
+        {% if view.action == "confirm" %}Conferma performance{% else %}Rifiuta performance{% endif %}
+    </h1>
+    <p class="text-sm text-slate-600 mb-4">
+        {% if view.action == "confirm" %}
+            Confermi la programmazione della performance seguente?
+        {% else %}
+            Vuoi rifiutare la performance seguente? Verrà annullata.
+        {% endif %}
+    </p>
+
+    <dl class="divide-y divide-slate-200 rounded-2xl border border-slate-200 mb-6">
+        <div class="flex justify-between gap-4 px-4 py-3">
+            <dt class="text-slate-500">Spettacolo</dt>
+            <dd class="font-medium text-slate-900">{{ performance.show.title }}</dd>
+        </div>
+        <div class="flex justify-between gap-4 px-4 py-3">
+            <dt class="text-slate-500">Teatro</dt>
+            <dd class="text-slate-700">{{ performance.auditorium.theater.name }} · {{ performance.auditorium.name }}</dd>
+        </div>
+        <div class="flex justify-between gap-4 px-4 py-3">
+            <dt class="text-slate-500">Data</dt>
+            <dd class="text-slate-700">{{ performance.starts_at|date:"d/m/Y H:i" }}</dd>
+        </div>
+    </dl>
+
+    <div class="flex flex-wrap justify-end gap-2">
+        <a class="btn btn-outline btn-sm" href="{% url 'shows:artist_performances_dashboard' %}">Annulla</a>
+        <form method="post">
+            {% csrf_token %}
+            {% if view.action == "confirm" %}
+                <button class="btn btn-primary btn-sm" type="submit">Conferma</button>
+            {% else %}
+                <button class="btn btn-primary btn-sm" type="submit">Rifiuta</button>
+            {% endif %}
+        </form>
+    </div>
+</div>
+{% endblock %}

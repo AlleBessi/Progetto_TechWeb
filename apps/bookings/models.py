@@ -40,15 +40,6 @@ class BookingSeatQuerySet(models.QuerySet["BookingSeat"]):
     def conflicting_seat_ids(
         self, performance, seat_ids, exclude_booking=None, exclude_pk=None, lock=False
     ) -> set:
-        """Seat IDs among ``seat_ids`` already held by a booking for
-        ``performance``.
-
-        The single source of truth for seat-availability. Views pass
-        ``lock=True`` inside a transaction for a race-safe
-        (``SELECT ... FOR UPDATE``) check; ``exclude_booking`` skips a booking's
-        own seats (updates) and ``exclude_pk`` skips a single row (model
-        self-validation).
-        """
         qs = self.for_performance(performance).filter(seat_id__in=seat_ids)
         if exclude_booking is not None:
             qs = qs.exclude(booking=exclude_booking)
@@ -94,9 +85,9 @@ class Booking(models.Model):
             perf = Performance.objects.filter(pk=self.performance_id).first()
             if perf:
                 if perf.status != Performance.STATUS_SCHEDULED:
-                    raise ValidationError("Bookings can only be made for scheduled performances.")
+                    raise ValidationError("Le prenotazioni sono possibili solo per performance programmate.")
                 if perf.starts_at and perf.starts_at < timezone.now():
-                    raise ValidationError("Cannot create bookings for performances in the past.")
+                    raise ValidationError("Non e' possibile prenotare per performance passate.")
 
     def save(self, *args, **kwargs):
         # Run full validation before saving to prevent accidental bookings
@@ -124,7 +115,7 @@ class BookingSeat(models.Model):
     def clean(self):
         if self.booking and self.performance:
             if self.booking.performance.pk != self.performance.pk:
-                raise ValidationError("Booking and performance must match.")
+                raise ValidationError("La prenotazione e la performance non corrispondono.")
         if self.performance_id and self.seat_id:
             conflict = BookingSeat.objects.conflicting_seat_ids(
                 self.performance_id, [self.seat_id], exclude_pk=self.pk

@@ -41,19 +41,25 @@ class TheaterAdminForm(forms.ModelForm):
         }
         help_texts = {"user": "Seleziona un gestore"}
 
-    def __init__(self, *args, **kwargs):
-        theater = kwargs.pop("theater", None)
+    def __init__(self, *args, theater=None, **kwargs):
         super().__init__(*args, **kwargs)
         managers_qs = get_user_model().objects.filter(groups__name="manager").distinct().order_by("username")
         self.fields["user"].queryset = managers_qs
         if theater is not None:
-            self.theater = theater
+            self.instance.theater = theater
 
     def clean_user(self):
         user = self.cleaned_data.get("user")
         if not user or not user.groups.filter(name="manager").exists():
             raise ValidationError("Solo i gestori possono essere assegnati ai teatri.")
         return user
+
+    def clean(self):
+        cleaned_data = super().clean()
+        user = cleaned_data.get("user")
+        if user and TheaterAdmin.objects.filter(theater=self.instance.theater, user=user).exists():
+            raise ValidationError("Questo gestore è già assegnato al teatro.")
+        return cleaned_data
 
 
 class AuditoriumZoneForm(forms.ModelForm):

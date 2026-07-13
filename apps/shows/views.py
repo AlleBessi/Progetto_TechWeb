@@ -1,19 +1,21 @@
+from typing import cast
+
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.db import transaction
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.functional import cached_property
 from django.views import View
 from django.views.generic import CreateView, DeleteView, ListView, UpdateView, DetailView
+from django.views.generic.detail import SingleObjectMixin
 
 from apps.core.mixins import (
     ArtistRequiredMixin,
     ManagerAccessMixin,
 )
-from apps.theaters.models import Auditorium, Theater
+from apps.theaters.models import Auditorium
 
 from .forms import PerformanceForm, ShowForm
 from .models import Performance, Show
@@ -143,31 +145,29 @@ class ArtistPerformanceDashboardView(ArtistRequiredMixin, ListView):
 		return context
 
 
-class PerformanceConfirmView(ArtistRequiredMixin, View):
+class PerformanceConfirmView(ArtistRequiredMixin, SingleObjectMixin, View):
+	object: Performance
+	
 	action = "confirm"
+	pk_url_kwarg = "performance_id"
+	template_name = "shows/performance_confirm.html"
 
-	def get_performance(self):
-		if not hasattr(self, "performance"):
-			self.performance = get_object_or_404(
-				Performance.objects.select_related("show", "show__artist", "auditorium__theater"),
-				pk=self.kwargs["performance_id"],
-			)
-		return self.performance
+	def get_queryset(self):
+		return (
+			Performance.objects.owned_by(self.request.user)
+			.select_related("show", "show__artist", "auditorium__theater")
+		)
 
-	def dispatch(self, request, *args, **kwargs):
-		if not request.user.is_authenticated:
-			# Let ArtistRequiredMixin handle the anonymous case (login redirect)
-			# rather than comparing ownership against AnonymousUser.
-			return super().dispatch(request, *args, **kwargs)
-		performance = self.get_performance()
-		if not request.user.is_superuser and performance.show.artist_id != request.user.id:
-			raise PermissionDenied
-		if request.method.lower() != "post":
-			return redirect("shows:artist_performances_dashboard")
-		return super().dispatch(request, *args, **kwargs)
+	def get_object(self, queryset=None) -> Performance:
+		return cast(Performance, super().get_object(queryset))
+
+	def get(self, request, *args, **kwargs):
+		self.object = performance = self.get_object()
+		context = self.get_context_data(object=performance)
+		return render(request, self.template_name, context)
 
 	def post(self, request, *args, **kwargs):
-		performance = self.get_performance()
+		self.object = performance = self.get_object()
 		if self.action == "confirm":
 			performance.status = Performance.STATUS_SCHEDULED
 			performance.confirmed_by_artist = True
@@ -191,9 +191,6 @@ class PerformanceFormBase(ManagerAccessMixin):
 	raise_exception = True
 
 	def get_performance(self) -> Performance | None:
-		return None
-
-	def get_selected_auditorium(self) -> Auditorium | None:
 		return None
 
 	def get_form_kwargs(self):
@@ -234,11 +231,14 @@ class PerformanceFormBase(ManagerAccessMixin):
 		}
 		performance.set_zone_prices(price_by_zone)
 
+	def get_success_url(self):
+		return reverse(
+			"theaters:management_schedule",
+			kwargs={"theater_id": self.object.auditorium.theater_id},
+		)
+
 
 class PerformanceCreate(PerformanceFormBase, CreateView):
-
-	def get_theater(self):
-		return get_object_or_404(Theater, pk=self.kwargs["theater_id"])
 
 	def get_selected_auditorium(self):
 		auditorium_id = self.request.POST.get("auditorium")
@@ -264,10 +264,6 @@ class PerformanceCreate(PerformanceFormBase, CreateView):
 		return redirect(self.get_success_url())
 
 
-	def get_success_url(self):
-		return reverse("theaters:management_schedule", kwargs={"theater_id": self.object.auditorium.theater_id})
-
-
 class PerformanceUpdate(PerformanceFormBase, UpdateView):
 	object: Performance
 
@@ -279,9 +275,12 @@ class PerformanceUpdate(PerformanceFormBase, UpdateView):
 
 	@cached_property
 	def performance(self) -> Performance:
-		return self.get_object()
+		return super().get_object()
 
 	def get_performance(self) -> Performance:
+		return self.performance
+
+	def get_object(self, queryset=None) -> Performance:
 		return self.performance
 
 	def get_selected_auditorium(self):
@@ -304,17 +303,12 @@ class PerformanceUpdate(PerformanceFormBase, UpdateView):
 
 		with transaction.atomic():
 			performance = form.save(commit=False)
-			performance.created_by = self.request.user
 			performance.save()
 			self.save_zone_prices(performance, form)
 
 		self.object = performance
 		messages.success(self.request, "Performance aggiornata con successo.")
 		return redirect(self.get_success_url())
-
-	def get_success_url(self):
-		return reverse("theaters:management_schedule", kwargs={"theater_id": self.object.auditorium.theater_id})
-
 
 
 class PerformanceDeleteView(ManagerAccessMixin, DeleteView):

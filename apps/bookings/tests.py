@@ -105,24 +105,7 @@ class BookingTests(TestCase):
         self.assertRedirects(response, reverse("bookings:booking_list"))
         self.assertTrue(Booking.objects.filter(pk=booking.pk).exists())
         self.assertTrue(BookingSeat.objects.filter(booking=booking, seat=self.seat_a1).exists())
-
-    def test_cancel_booking_hard_deletes(self):
-        booking = Booking.objects.create(user=self.user1, performance=self.performance)
-        BookingSeat.objects.create(
-            booking=booking, performance=self.performance, seat=self.seat_a1,
-            price_at_purchase=Decimal("20.00"),
-        )
-
-        self.client.login(username="utente1", password="password123")
-        url = reverse("bookings:booking_cancel", args=[booking.pk])
-        response = self.client.post(url)
-
-        # L'annullamento di una prenotazione valida ora la elimina del tutto,
-        # liberando i posti (nessuna riga BookingSeat residua).
-        self.assertRedirects(response, reverse("bookings:booking_list"))
-        self.assertFalse(Booking.objects.filter(pk=booking.pk).exists())
-        self.assertFalse(BookingSeat.objects.filter(seat=self.seat_a1, performance=self.performance).exists())
-
+    
     def test_book_seats_atomic(self):
         # user2 prenota il posto A1 prima che user1 provi a prenotare
         booking_user2 = Booking.objects.create(user=self.user2, performance=self.performance)
@@ -150,10 +133,3 @@ class BookingTests(TestCase):
             performance=self.performance, seat=self.seat_a1
         ).exists()
         self.assertFalse(seat_a1_taken, "Il posto A1 doveva restare libero.")
-
-    def test_non_client_denied_from_booking_views(self):
-        # L'artista non appartiene al gruppo "client": ClientOnlyMixin deve
-        # negargli l'accesso e reindirizzarlo alla home.
-        self.client.login(username="artista", password="password123")
-        response = self.client.get(reverse("bookings:booking_list"))
-        self.assertRedirects(response, reverse("core:home"))

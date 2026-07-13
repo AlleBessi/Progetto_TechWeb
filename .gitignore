@@ -6,3 +6,12 @@ media/
 staticfiles/
 .env
 .DS_Store
+*.bak
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# Working notes / local cache
+TODO.md
+cache/

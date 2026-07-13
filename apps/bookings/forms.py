@@ -3,7 +3,7 @@ from django import forms
 from .utils import build_zone_layout
 from apps.theaters.models import Seat
 
-from .models import Booking, BookingSeat
+from .models import BookingSeat
 
 
 class BookingForm(forms.Form):
@@ -29,8 +29,6 @@ class BookingForm(forms.Form):
         # Django's generic "not a valid choice" field error.
         self.fields["seats"].queryset = performance.auditorium.seats.all()
 
-        # Pre-selected seat IDs come from the form's initial data (set by the
-        # view via get_initial), so no extra query is needed here.
         selected_ids = set(self.initial.get("seats", []))
 
         self.zone_layout = build_zone_layout(

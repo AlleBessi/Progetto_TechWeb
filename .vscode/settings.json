@@ -1,7 +1,0 @@
-{
-    "chat.tools.terminal.autoApprove": {
-        "\"/home/alessandro-bessi/Documenti/Tecnologie": true,
-        "pipenv": true
-    },
-    "python.analysis.autoImportCompletions": true
-}

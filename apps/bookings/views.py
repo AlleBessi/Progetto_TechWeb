@@ -21,12 +21,6 @@ from .utils import build_zone_layout
 
 
 def allocate_seats(booking, performance, seats):
-	"""Replace ``booking``'s seats with ``seats`` and recompute total_price.
-
-	Shared by the create and update flows. Relies on ``BookingSeat.clean()`` /
-	the ``unique_together`` constraint for the availability check; the caller
-	runs it inside a transaction so a conflict rolls back.
-	"""
 	seat_prices = [
 		(seat, performance.zone_price(seat.auditorium_zone)) for seat in seats
 	]
@@ -53,50 +47,6 @@ class BookingList(ClientOnlyMixin, ListView):
 			.select_related("performance__show", "performance__auditorium__theater")
 			.prefetch_related("seats__seat")
 		)
-
-
-class BookingCancelBase(View):
-	"""Cancel (hard-delete) a booking, freeing its seats. POST only.
-
-	Access control and scoping (queryset, success URL, cancel rule) are supplied
-	by the concrete client / manager subclasses.
-	"""
-
-	def get_queryset(self):
-		raise NotImplementedError
-
-	def get_success_url(self):
-		raise NotImplementedError
-
-	def cancel_blocked_redirect(self, booking) -> HttpResponse | None:
-		"""Return a redirect if this booking may not be cancelled, else None."""
-		return None
-
-	def post(self, request, *args, **kwargs):
-		booking = get_object_or_404(self.get_queryset(), pk=kwargs.get("booking_id"))
-		blocked = self.cancel_blocked_redirect(booking)
-		if blocked is not None:
-			return blocked
-		booking.delete()
-		messages.success(request, "Prenotazione annullata.")
-		return redirect(self.get_success_url())
-
-
-class BookingCancel(ClientOnlyMixin, BookingCancelBase):
-	"""Client-facing booking cancellation."""
-
-	def get_queryset(self):
-		return Booking.objects.filter(user=self.request.user)
-
-	def get_success_url(self):
-		return reverse("bookings:booking_list")
-
-	def cancel_blocked_redirect(self, booking):
-		performance = booking.performance
-		if performance.status != Performance.STATUS_SCHEDULED or performance.starts_at < timezone.now():
-			messages.error(self.request, "Non e possibile annullare una prenotazione per una performance gia iniziata o non piu disponibile.")
-			return redirect(self.get_success_url())
-		return None
 
 
 class BookingCreate(ClientOnlyMixin, FormView):
@@ -130,8 +80,11 @@ class BookingCreate(ClientOnlyMixin, FormView):
 			with transaction.atomic():
 				booking = Booking.objects.create(user=self.request.user, performance=self.performance)
 				allocate_seats(booking, self.performance, selected_seats)
-		except (ValidationError, IntegrityError):
-			messages.error(self.request, "Alcuni posti non sono più disponibili.")
+		except IntegrityError:
+			messages.error(self.request, "Errore di integrità.")
+			return redirect("bookings:booking_create", performance_id=self.performance.pk)
+		except ValidationError as exc:
+			messages.error(self.request, " ".join(exc.messages))
 			return redirect("bookings:booking_create", performance_id=self.performance.pk)
 		messages.success(self.request, "Prenotazione completata.")
 		return super().form_valid(form)
@@ -212,6 +165,45 @@ class BookingUpdate(ClientOnlyMixin, BookingUpdateBase):
 	def conflict_redirect(self):
 		return redirect("bookings:booking_update", booking_id=self.booking.pk)
 
+
+class BookingCancelBase(View):
+	http_method_names = ["post"]
+
+	def get_queryset(self):
+		raise NotImplementedError
+
+	def get_success_url(self):
+		raise NotImplementedError
+
+	def cancel_blocked_redirect(self, booking) -> HttpResponse | None:
+		"""Return a redirect if this booking may not be cancelled, else None."""
+		return None
+
+	def post(self, request, *args, **kwargs):
+		booking = get_object_or_404(self.get_queryset(), pk=kwargs.get("booking_id"))
+		blocked = self.cancel_blocked_redirect(booking)
+		if blocked is not None:
+			return blocked
+		booking.delete()
+		messages.success(request, "Prenotazione annullata.")
+		return redirect(self.get_success_url())
+
+
+class BookingCancel(ClientOnlyMixin, BookingCancelBase):
+	"""Client-facing booking cancellation."""
+
+	def get_queryset(self):
+		return Booking.objects.filter(user=self.request.user)
+
+	def get_success_url(self):
+		return reverse("bookings:booking_list")
+
+	def cancel_blocked_redirect(self, booking):
+		performance = booking.performance
+		if performance.status != Performance.STATUS_SCHEDULED or performance.starts_at < timezone.now():
+			messages.error(self.request, "Non e possibile annullare una prenotazione per una performance gia iniziata o non piu disponibile.")
+			return redirect(self.get_success_url())
+		return None
 
 # ---------------------------------------------------------------------------
 # Theater-manager variants — reuse the base booking views, scoped to a theater.

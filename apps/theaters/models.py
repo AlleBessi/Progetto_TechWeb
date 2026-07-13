@@ -75,13 +75,6 @@ class Auditorium(models.Model):
 
     def _next_cod_auditorium(self) -> int:
         """Compute the next sequential code for this theater.
-
-        Locks the parent Theater row with SELECT FOR UPDATE, which serialises
-        all concurrent inserts for the same theater inside their respective
-        transactions.  The second transaction waits at the lock, then reads
-        the updated MAX and computes a fresh, non-conflicting value.
-        No retry loop is required.
-
         Must be called inside an existing transaction.atomic() block.
         """
         Theater.objects.select_for_update().get(pk=self.theater_id)

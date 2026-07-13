@@ -30,18 +30,8 @@ class ArtistRequiredMixin(LoginRequiredMixin, GroupRequiredMixin):
 
 
 class TheaterManagerRequiredMixin(LoginRequiredMixin, GroupRequiredMixin):
-    """Group-wide gate for the 'manager' group (and superusers).
-
-    Use for views with **no specific theater in scope** (e.g. the management
-    dashboard landing page): access is granted to anyone in the ``manager``
-    group, and failures redirect to login instead of raising 403
-    (``raise_exception = False``).
-
-    Note: this is deliberately distinct from :class:`ManagerAccessMixin`, which
-    performs a *per-theater* object-level check and raises 403. Pick this one
-    only when there is no theater to scope against.
-    """
-
+    """Allow the 'manager' group (and superusers)."""
+    
     group_required = "manager"
     raise_exception = False
 

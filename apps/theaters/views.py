@@ -133,10 +133,6 @@ class TheaterManagementBookingsView(TheaterManagementContextMixin, TemplateView)
 
 
 class TheaterManagementOccupazioneView(TheaterManagementContextMixin, TemplateView):
-    """List-only view: the filtered performances with their occupancy summary.
-
-    Selecting a performance opens the full-page detail (TheaterOccupancyDetailView).
-    """
     template_name = "theaters/theater_management_occupazione.html"
 
     def get_context_data(self, **kwargs):
@@ -156,7 +152,6 @@ class TheaterManagementOccupazioneView(TheaterManagementContextMixin, TemplateVi
 
 
 class TheaterOccupancyDetailView(TheaterManagementContextMixin, TemplateView):
-    """Full-page occupancy cruscotto for a single performance."""
     template_name = "theaters/theater_occupancy_detail.html"
 
     def get_context_data(self, **kwargs):
@@ -271,6 +266,7 @@ class TheaterAdminAddView(TheaterManagementContextMixin, CreateView):
     model = TheaterAdmin
     form_class = TheaterAdminForm
     template_name = "theaters/theater_admin_add.html"
+    object: TheaterAdmin
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -278,16 +274,16 @@ class TheaterAdminAddView(TheaterManagementContextMixin, CreateView):
         return kwargs
 
     def form_valid(self, form):
-        theater = self.get_theater()
-        user = form.cleaned_data["user"]
-        # Idempotent: re-adding an existing manager must not violate
-        # unique_together(theater, user).
-        TheaterAdmin.objects.get_or_create(theater=theater, user=user)
+        response = super().form_valid(form)
+        user = self.object.user
         messages.success(
             self.request,
             f"Gestore {user.get_full_name() or user.username} assegnato al teatro.",
         )
-        return redirect("theaters:management_admins", theater_id=theater.pk)
+        return response
+
+    def get_success_url(self):
+        return reverse("theaters:management_admins", kwargs={"theater_id": self.get_theater().pk})
 
  
 class TheaterAdminRemoveView(TheaterScopedMixin, ManagerAccessMixin, DeleteView):
@@ -435,8 +431,3 @@ class AuditoriumDeleteView(TheaterScopedMixin, ManagerAccessMixin, DeleteView):
         response = super().form_valid(form)
         messages.success(self.request, "Sala eliminata.")
         return response
-
-
-# NOTE: Booking cancel/update for managers now live in apps.bookings.views
-# (BookingCancelManager / BookingUpdateManager) and are routed from this app's
-# urls.py under the theaters: namespace.
