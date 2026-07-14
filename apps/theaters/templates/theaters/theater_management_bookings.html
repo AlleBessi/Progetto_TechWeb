@@ -48,7 +48,6 @@
                             <td class="px-4 py-3 text-right font-medium text-slate-900">€ {{ booking.total_price }}</td>
                             <td class="px-4 py-3 text-right">
                                 <div class="flex flex-wrap justify-end gap-2">
-                                    <a class="btn btn-outline btn-sm" href="{% url 'theaters:booking_update' theater.id booking.id %}">Modifica</a>
                                     <form action="{% url 'theaters:booking_cancel' theater.id booking.id %}" method="post">
                                         {% csrf_token %}
                                         <button class="btn btn-danger btn-sm" type="submit">Annulla</button>

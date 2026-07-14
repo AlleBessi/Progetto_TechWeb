@@ -1,7 +1,4 @@
-from typing import cast
-
 from django.contrib import messages
-from django.contrib.auth.mixins import UserPassesTestMixin
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
@@ -30,18 +27,14 @@ class ShowList(ListView):
 		return Show.objects.select_related("category", "artist")
 
 
-class ShowDetail(UserPassesTestMixin, DetailView):
+class ShowDetail(DetailView):
 	model = Show
 	template_name = "shows/show_detail.html"
 	context_object_name = "show"
 	pk_url_kwarg = "show_id"
-	raise_exception = True
 
 	def get_queryset(self):
 		return Show.objects.select_related("category", "artist")
-
-	def test_func(self):
-		return True
 
 	def get_context_data(self, **kwargs):
 		context = super().get_context_data(**kwargs)
@@ -70,17 +63,6 @@ class ShowUpdate(ArtistRequiredMixin, UpdateView):
 	form_class = ShowForm
 	template_name = "shows/show_form.html"
 	pk_url_kwarg = "show_id"
-
-	def get_initial(self):
-		show = self.get_object()
-		return {
-			"title": show.title,
-			"description": show.description,
-			"category": show.category,
-			"duration_minutes": show.duration_minutes,
-			"poster": show.poster,
-			"cover": show.cover,
-		}
 
 	def get_queryset(self):
 		return Show.objects.owned_by(self.request.user)
@@ -157,9 +139,6 @@ class PerformanceConfirmView(ArtistRequiredMixin, SingleObjectMixin, View):
 			Performance.objects.owned_by(self.request.user)
 			.select_related("show", "show__artist", "auditorium__theater")
 		)
-
-	def get_object(self, queryset=None) -> Performance:
-		return cast(Performance, super().get_object(queryset))
 
 	def get(self, request, *args, **kwargs):
 		self.object = performance = self.get_object()
@@ -294,6 +273,9 @@ class PerformanceUpdate(PerformanceFormBase, UpdateView):
 		performance = self.get_performance()
 		if not performance.is_modifiable:
 			messages.error(request, "Questa performance è stata annullata e non può essere modificata.")
+			return redirect("theaters:management_schedule", theater_id=performance.auditorium.theater_id)
+		if performance.bookings.exists():
+			messages.error(request, "Non puoi modificare una performance con prenotazioni.")
 			return redirect("theaters:management_schedule", theater_id=performance.auditorium.theater_id)
 		return super().dispatch(request, *args, **kwargs)
 

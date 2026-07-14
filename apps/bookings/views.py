@@ -17,7 +17,6 @@ from apps.core.mixins import ClientOnlyMixin, ManagerAccessMixin, TheaterScopedM
 
 from .forms import BookingForm
 from .models import Booking, BookingSeat
-from .utils import build_zone_layout
 
 
 def allocate_seats(booking, performance, seats):
@@ -90,17 +89,16 @@ class BookingCreate(ClientOnlyMixin, FormView):
 		return super().form_valid(form)
 
 
-class BookingUpdateBase(FormView):
-	"""Reassign a booking's seats. POST rewrites the seats atomically.
-
-	Access control and scoping (queryset, success URL, redirect targets) are
-	supplied by the concrete client / manager subclasses.
-	"""
+class BookingUpdate(ClientOnlyMixin, FormView):
+	"""Client-facing booking update. Reassign a booking's seats; POST rewrites
+	the seats atomically."""
 
 	form_class = BookingForm
+	template_name = "bookings/booking_update.html"
+	success_url = reverse_lazy("bookings:booking_list")
 
 	def get_queryset(self):
-		raise NotImplementedError
+		return Booking.objects.filter(user=self.request.user)
 
 	@cached_property
 	def booking(self) -> Booking:
@@ -118,7 +116,7 @@ class BookingUpdateBase(FormView):
 		return None
 
 	def conflict_redirect(self):
-		raise NotImplementedError
+		return redirect("bookings:booking_update", booking_id=self.booking.pk)
 
 	def get(self, request, *args, **kwargs):
 		return self.editable_or_redirect() or super().get(request, *args, **kwargs)
@@ -151,19 +149,6 @@ class BookingUpdateBase(FormView):
 			return self.conflict_redirect()
 		messages.success(self.request, "Prenotazione aggiornata.")
 		return super().form_valid(form)
-
-
-class BookingUpdate(ClientOnlyMixin, BookingUpdateBase):
-	"""Client-facing booking update."""
-
-	template_name = "bookings/booking_update.html"
-	success_url = reverse_lazy("bookings:booking_list")
-
-	def get_queryset(self):
-		return Booking.objects.filter(user=self.request.user)
-
-	def conflict_redirect(self):
-		return redirect("bookings:booking_update", booking_id=self.booking.pk)
 
 
 class BookingCancelBase(View):
@@ -222,34 +207,3 @@ class BookingCancelManager(TheaterScopedMixin, ManagerAccessMixin, BookingCancel
 
 	def get_success_url(self):
 		return reverse("theaters:management_bookings", kwargs={"theater_id": self.get_theater().pk})
-
-
-class BookingUpdateManager(TheaterScopedMixin, ManagerAccessMixin, BookingUpdateBase):
-	"""Update a booking's seats on behalf of a theater manager."""
-
-	template_name = "bookings/booking_update_manager.html"
-
-	def get_queryset(self):
-		return (
-			Booking.objects.filter(performance__auditorium__theater=self.get_theater())
-			.select_related("performance__auditorium", "performance__show")
-		)
-
-	def get_success_url(self):
-		return reverse("theaters:management_bookings", kwargs={"theater_id": self.get_theater().pk})
-
-	def conflict_redirect(self):
-		return redirect("theaters:booking_update", theater_id=self.get_theater().pk, booking_id=self.booking.pk)
-
-	def get_context_data(self, **kwargs):
-		ctx = super().get_context_data(**kwargs)
-		performance = self.performance
-		reserved = set(
-			BookingSeat.objects.for_performance(performance)
-			.exclude(booking=self.booking)
-			.reserved_seat_ids()
-		)
-		selected_ids = set(self.booking.seats.values_list("seat_id", flat=True))
-		ctx["theater"] = self.get_theater()
-		ctx["zone_layout"] = build_zone_layout(performance, reserved, selected_ids)
-		return ctx

@@ -44,8 +44,8 @@ urlpatterns = [
 
     # ── Booking management – theater-scoped overrides ────────────────────────
     # Full user-facing booking CRUD lives in the bookings app.
-    # Only theater-manager-specific actions (with theater context) live here.
-    path("management/<int:theater_id>/bookings/<int:booking_id>/edit/", booking_views.BookingUpdateManager.as_view(), name="booking_update"),
+    # Managers may only cancel bookings (not edit them), so only the cancel
+    # action is exposed here with theater context.
     path("management/<int:theater_id>/bookings/<int:booking_id>/cancel/", booking_views.BookingCancelManager.as_view(), name="booking_cancel"),
 
     # NOTE: Performance CRUD (create / edit / delete / confirm / reject) is
