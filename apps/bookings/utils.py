@@ -1,5 +1,8 @@
 from collections import defaultdict
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
 from apps.bookings.models import BookingSeat
 
 
@@ -94,3 +97,28 @@ def calculate_occupancy(performance, zone_layout):
         "global_booked": global_booked,
         "global_percentage": global_percentage,
     }
+
+
+def broadcast_occupancy(performance):
+    """Push the current occupancy of *performance* to its WebSocket group.
+
+    Called after any seat mutation (create / update / cancel). Recomputes the
+    full reserved-seat set and occupancy stats from the DB so the manager
+    dashboard stays in sync, then broadcasts to the ``performance_<pk>`` group
+    handled by ``OccupancyConsumer.occupancy_update``.
+    """
+    reserved = list(
+        BookingSeat.objects.for_performance(performance).reserved_seat_ids()
+    )
+    zone_layout = build_zone_layout(performance, set(reserved))
+    occupancy = calculate_occupancy(performance, zone_layout)
+
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"performance_{performance.pk}",
+        {
+            "type": "occupancy_update",
+            "reserved_seats": reserved,
+            "occupancy": occupancy,
+        },
+    )

@@ -31,6 +31,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -46,6 +47,7 @@ INSTALLED_APPS = [
     'apps.shows.apps.ShowsConfig',
     'apps.bookings.apps.BookingsConfig',
     'apps.core.apps.CoreConfig',
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -77,6 +79,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'theater_booking.wsgi.application'
+ASGI_APPLICATION = 'theater_booking.asgi.application'
 
 
 # Database
@@ -155,3 +158,9 @@ SELECT2_CSS = [
 ]
 SELECT2_I18N_PATH = "assets/vendor/select2/dist/js/i18n"
 SELECT2_THEME = 'teatro'
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    }
+}

@@ -10,8 +10,34 @@ from braces.views import GroupRequiredMixin, LoginRequiredMixin, UserPassesTestM
 from django.contrib import messages
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from apps.theaters.models import Theater, TheaterAdmin
+
+
+def safe_back_url(request: HttpRequest, *, fallback: str = "core:home") -> str:
+    """Restituisce un URL 'indietro' sicuro (stesso host) per l'utente.
+
+    Usa l'header Referer, validato contro l'host corrente per evitare open-redirect.
+    Ricade su ``fallback`` (nome di URL) quando il referer manca, è cross-host, o è la
+    pagina corrente (che genererebbe un loop).
+    """
+    from urllib.parse import urlparse
+
+    fallback_url = reverse(fallback)
+    referer = request.META.get("HTTP_REFERER")
+    if not referer:
+        return fallback_url
+    if not url_has_allowed_host_and_scheme(
+        referer,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return fallback_url
+    if urlparse(referer).path == request.path:
+        return fallback_url
+    return referer
 
 
 # ---------------------------------------------------------------------------

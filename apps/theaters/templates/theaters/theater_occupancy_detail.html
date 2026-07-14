@@ -43,9 +43,9 @@
                                     <span class="w-6 text-xs text-slate-500">{{ row }}</span>
                                     {% for item in seats %}
                                         {% if item.is_reserved %}
-                                            <span class="seat"><span class="seat-label seat-reserved">{{ item.seat.number }}</span></span>
+                                            <span class="seat" data-seat-id="{{ item.seat.id }}" data-zone-class="{{ zone.color_class }}"><span class="seat-label seat-reserved">{{ item.seat.number }}</span></span>
                                         {% else %}
-                                            <span class="seat {{ zone.color_class }}"><span class="seat-label">{{ item.seat.number }}</span></span>
+                                            <span class="seat {{ zone.color_class }}" data-seat-id="{{ item.seat.id }}" data-zone-class="{{ zone.color_class }}"><span class="seat-label">{{ item.seat.number }}</span></span>
                                         {% endif %}
                                     {% endfor %}
                                 </div>
@@ -60,13 +60,13 @@
             <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Occupazione per zona</h3>
             <div class="space-y-4">
                 {% for zone in occupancy_data.zones %}
-                    <div>
+                    <div data-zone-block="{{ zone.color_class }}">
                         <div class="flex items-center justify-between text-xs text-slate-600">
                             <span>{{ zone.label }}</span>
-                            <span>{{ zone.booked }}/{{ zone.total }} • {{ zone.percentage }}%</span>
+                            <span data-role="zone-count">{{ zone.booked }}/{{ zone.total }} • {{ zone.percentage }}%</span>
                         </div>
                         <div class="h-2 w-full overflow-hidden rounded bg-slate-100 mt-1">
-                            <div class="h-2 rounded zone-bar {{ zone.color_class }}" style="width: {{ zone.percentage|unlocalize }}%;"></div>
+                            <div class="h-2 rounded zone-bar {{ zone.color_class }}" data-role="zone-bar" style="width: {{ zone.percentage|unlocalize }}%;"></div>
                         </div>
                     </div>
                 {% endfor %}
@@ -76,13 +76,84 @@
                 <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Totale sala</h3>
                 <div class="flex items-center justify-between text-xs text-slate-600 mt-2">
                     <span>Occupazione globale</span>
-                    <span>{{ occupancy_data.global_booked }}/{{ occupancy_data.global_total }} • {{ occupancy_data.global_percentage }}%</span>
+                    <span data-role="global-count">{{ occupancy_data.global_booked }}/{{ occupancy_data.global_total }} • {{ occupancy_data.global_percentage }}%</span>
                 </div>
                 <div class="h-2 w-full overflow-hidden rounded bg-slate-100 mt-2">
-                    <div class="h-2 rounded bg-indigo-400" style="width: {{ occupancy_data.global_percentage|unlocalize }}%;"></div>
+                    <div class="h-2 rounded bg-indigo-400" data-role="global-bar" style="width: {{ occupancy_data.global_percentage|unlocalize }}%;"></div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const performanceId = "{{ selected_performance.id }}";
+
+    // Create the connection
+    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    const socket = new WebSocket(protocol + window.location.host + '/ws/theaters/performance/' + performanceId + '/');
+
+    socket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'occupancy_update') {
+            updateSeats(data.reserved_seats);
+            updateOccupancy(data.occupancy);
+        }
+    };
+
+    socket.onclose = function(e) {
+        console.error('WebSocket occupazione disconnesso');
+    };
+
+    function updateSeats(reservedSeatIds) {
+        const reserved = new Set(reservedSeatIds.map(String));
+
+        document.querySelectorAll('.seat[data-seat-id]').forEach(function(seat) {
+            const seatId = seat.getAttribute('data-seat-id');
+            const zoneClass = seat.getAttribute('data-zone-class');
+            const label = seat.querySelector('.seat-label');
+
+            if (reserved.has(seatId)) {
+                // Free -> occupied
+                seat.classList.remove(zoneClass);
+                label.classList.add('seat-reserved');
+            } else {
+                // Occupied -> free
+                label.classList.remove('seat-reserved');
+                seat.classList.add(zoneClass);
+            }
+        });
+    }
+
+    function updateOccupancy(occupancy) {
+        // Per-zone bars, joined to the DOM by color_class
+        occupancy.zones.forEach(function(zone) {
+            const block = document.querySelector(`[data-zone-block="${zone.color_class}"]`);
+            if (!block) {
+                return;
+            }
+            const count = block.querySelector('[data-role="zone-count"]');
+            const bar = block.querySelector('[data-role="zone-bar"]');
+            if (count) {
+                count.textContent = `${zone.booked}/${zone.total} • ${zone.percentage}%`;
+            }
+            if (bar) {
+                bar.style.width = `${zone.percentage}%`;
+            }
+        });
+
+        // Global bar
+        const globalCount = document.querySelector('[data-role="global-count"]');
+        const globalBar = document.querySelector('[data-role="global-bar"]');
+        if (globalCount) {
+            globalCount.textContent = `${occupancy.global_booked}/${occupancy.global_total} • ${occupancy.global_percentage}%`;
+        }
+        if (globalBar) {
+            globalBar.style.width = `${occupancy.global_percentage}%`;
+        }
+    }
+</script>
 {% endblock %}

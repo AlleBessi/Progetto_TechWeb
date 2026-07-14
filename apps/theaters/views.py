@@ -45,7 +45,11 @@ class TheaterDetailView(DetailView):
         context = super().get_context_data(**kwargs)
         theater = self.object
         context["performances"] = (
-            Performance.objects.filter(auditorium__theater=theater, starts_at__gte=timezone.now())
+            Performance.objects.filter(
+                auditorium__theater=theater,
+                starts_at__gte=timezone.now(),
+                status=Performance.STATUS_SCHEDULED,
+            )
             .select_related("show", "show__artist", "auditorium")
             .order_by("starts_at")
         )

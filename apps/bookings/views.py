@@ -13,10 +13,11 @@ from django.views.generic.edit import FormView
 from django.urls import reverse, reverse_lazy
 
 from apps.shows.models import Performance
-from apps.core.mixins import ClientOnlyMixin, ManagerAccessMixin, TheaterScopedMixin
+from apps.core.mixins import ClientOnlyMixin, ManagerAccessMixin, TheaterScopedMixin, safe_back_url
 
 from .forms import BookingForm
 from .models import Booking, BookingSeat
+from .utils import broadcast_occupancy
 
 
 def allocate_seats(booking, performance, seats):
@@ -60,7 +61,7 @@ class BookingCreate(ClientOnlyMixin, FormView):
 		self.performance = get_object_or_404(Performance, pk=kwargs.get("performance_id"))
 		if self.performance.status != Performance.STATUS_SCHEDULED or self.performance.starts_at < timezone.now():
 			messages.error(request, "Performance non disponibile per la prenotazione.")
-			return redirect("core:home")  # type: ignore[return-value]
+			return redirect(safe_back_url(request))  # type: ignore[return-value]
 		return super().dispatch(request, *args, **kwargs)  # type: ignore[return-value]
 
 	def get_form_kwargs(self):
@@ -85,6 +86,7 @@ class BookingCreate(ClientOnlyMixin, FormView):
 		except ValidationError as exc:
 			messages.error(self.request, " ".join(exc.messages))
 			return redirect("bookings:booking_create", performance_id=self.performance.pk)
+		broadcast_occupancy(self.performance)
 		messages.success(self.request, "Prenotazione completata.")
 		return super().form_valid(form)
 
@@ -147,6 +149,7 @@ class BookingUpdate(ClientOnlyMixin, FormView):
 		except (ValidationError, IntegrityError):
 			messages.error(self.request, "Alcuni posti non sono più disponibili.")
 			return self.conflict_redirect()
+		broadcast_occupancy(self.performance)
 		messages.success(self.request, "Prenotazione aggiornata.")
 		return super().form_valid(form)
 
@@ -169,7 +172,9 @@ class BookingCancelBase(View):
 		blocked = self.cancel_blocked_redirect(booking)
 		if blocked is not None:
 			return blocked
+		performance = booking.performance
 		booking.delete()
+		broadcast_occupancy(performance)
 		messages.success(request, "Prenotazione annullata.")
 		return redirect(self.get_success_url())
 
