@@ -47,6 +47,11 @@ Il dominio è modellato attorno alle seguenti entità principali:
 - **Rappresentazione** (`Performance`) — uno spettacolo in una sala a una certa data/ora, con un ciclo di vita (in attesa di conferma dell'artista → programmata → annullata) e un prezzo per zona (`PerformancePrice`).
 - **Prenotazione** (`Booking`) — associa un utente a una rappresentazione, con i posti prenotati (`BookingSeat`). L'unicità del posto per rappresentazione è garantita a livello di database.
 
+### Aggiornamento realtime dell'occupazione con l'uso di un websocket
+Ho deciso di utilizzare un websocket per tenere aggiornato in realtime il quadro dell'occupazione dei posti di una rappresentazione all'interno della dashboard dell'amministratore di teatro.
+
+Ogni volta che un utente effettua, modifica o annulla una prenotazione, lo stato aggiornato dei posti occupati e le statistiche di occupazione vengono ricalcolati e inviati tramite websocket a tutti gli amministratori che stanno consultando il quadro di quella rappresentazione. In questo modo la mappa dei posti e le percentuali di riempimento si aggiornano istantaneamente, senza il bisogno di ricaricare la pagina.
+
 ### Test del software
 Sono stati realizzati tre test differenti all'interno del progetto (in `apps/bookings/tests.py`):
 
@@ -70,4 +75,5 @@ Oltre a **Django** (framework principale) e **Pillow** (gestione delle immagini 
 - **django-filter** — filtri di ricerca dei teatri e degli spettacoli (usato dalla `SearchView` tramite `FilterView`).
 - **django-select2** — campi di selezione avanzati con ricerca (widget Select2) nei form di gestione di spettacoli, rappresentazioni e amministratori.
 - **django-braces** — mixin aggiuntivi per le viste basate su classi; in particolare `GroupRequiredMixin` per il controllo degli accessi in base al gruppo/ruolo dell'utente.
+- **channels** — supporto ASGI e gestione dei websocket per l'aggiornamento realtime del quadro dell'occupazione dei posti.
 
