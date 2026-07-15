@@ -15,3 +15,4 @@ staticfiles/
 # Working notes / local cache
 TODO.md
 cache/
+.cache/
