@@ -32,7 +32,11 @@ def _recommended_performances(user, base_qs, limit=4):
 	if not user.is_authenticated:
 		return []
 
-	# Personal affinity signals, derived from the user's bookings.
+	# Build the personal affinity signals from the user's whole booking history
+	# in a single query. Each past booking increments the weight of its show's
+	# category and artist, so a taste booked more often counts proportionally
+	# more. booked_show_ids is collected in the same pass to later exclude shows
+	# the user has already seen.
 	category_weights: dict[int, int] = {}
 	artist_weights: dict[int, int] = {}
 	booked_show_ids: set[int] = set()
@@ -49,8 +53,12 @@ def _recommended_performances(user, base_qs, limit=4):
 	if not booked_show_ids:
 		return []  # no history → nothing to personalise on
 
-	# Soonest upcoming performance per not-yet-booked show (base_qs is ordered by
-	# starts_at), so a single show cannot fill every recommendation slot.
+	# Pick one performance per candidate show: the soonest upcoming one. base_qs
+	# is already ordered by starts_at, so the first performance seen for a show is
+	# its earliest, and setdefault keeps it (later, farther-off dates are ignored).
+	# Collapsing to one performance per show stops a single show with many dates
+	# from filling every recommendation slot. Shows already booked are skipped so
+	# we only ever suggest something new.
 	perf_by_show: dict[int, Performance] = {}
 	for performance in base_qs:
 		if performance.show_id in booked_show_ids:
@@ -61,7 +69,9 @@ def _recommended_performances(user, base_qs, limit=4):
 
 	candidate_show_ids = list(perf_by_show)
 
-	# Global popularity: bookings per candidate show (one aggregate).
+	# Global popularity: total bookings per candidate show, computed in one
+	# aggregate query. Used only as a "trending" tie-breaker when two shows have
+	# the same personal affinity — it never overrides the user's own taste.
 	popularity = dict(
 		Booking.objects.filter(
 			performance__show__in=candidate_show_ids,
@@ -74,11 +84,18 @@ def _recommended_performances(user, base_qs, limit=4):
 	scored = []
 	for show_id, performance in perf_by_show.items():
 		show = performance.show
+		# Affinity score: category matches weigh more than artist matches (3 vs 2),
+		# because genre is the stronger predictor of taste than a single artist.
 		affinity = category_weights.get(show.category_id, 0) * 3 + artist_weights.get(show.artist_id, 0) * 2
-		# Sort key: affinity first, then popularity, then soonest date. Using a
-		# tuple guarantees affinity always dominates popularity regardless of scale.
+		# Pack the ranking criteria into a tuple in priority order: affinity,
+		# then popularity, then soonest date. Comparing tuples makes affinity
+		# dominate popularity outright — no weighting/normalisation needed, so a
+		# very popular show can never outrank one that better matches the user.
 		scored.append((affinity, popularity.get(show_id, 0), performance.starts_at, performance))
 
+	# Sort by the tuple: affinity and popularity descending (hence the minus),
+	# starts_at ascending (soonest first). The trailing Performance is not part
+	# of the key — it just rides along and is unpacked out at the end.
 	scored.sort(key=lambda item: (-item[0], -item[1], item[2]))
 	return [performance for *_ignored, performance in scored[:limit]]
 
